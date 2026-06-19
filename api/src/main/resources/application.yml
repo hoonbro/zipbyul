@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: jipbyul-api
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:jipbyul}
+    username: ${POSTGRES_USER:jipbyul}
+    password: ${POSTGRES_PASSWORD:}
+  # 스키마는 별도 flyway 컨테이너가 단일 관리한다. 앱은 마이그레이션을 실행하지 않는다.
+  flyway:
+    enabled: false
+  jackson:
+    time-zone: Asia/Seoul
+
+server:
+  port: 8080
+
+fcm:
+  credentials-path: ${FCM_CREDENTIALS_JSON:}
+  project-id: ${FCM_PROJECT_ID:}
+
+notification:
+  consumer:
+    enabled: ${NOTIFICATION_CONSUMER_ENABLED:false}
+    batch-size: 100
+    max-retry: 5
+    poll-interval-ms: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always

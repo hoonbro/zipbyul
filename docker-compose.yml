@@ -1,0 +1,56 @@
+# 집별 MVP — 단일 호스트 Docker Compose (인프라 8-1)
+# 두 컨테이너(api/collector), 한 DB(postgres). Python 쓰기 / Spring 읽기.
+# 스키마 변경은 flyway 서비스로만 적용한 뒤 앱을 띄운다.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-Asia/Seoul}
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  # 스키마 SSOT — 앱 기동 전 마이그레이션 단일 적용
+  flyway:
+    image: flyway/flyway:10
+    command: -connectRetries=10 migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+    volumes: ["./db/migration:/flyway/sql"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Spring — 서빙·비회원·알림 워커 (읽기)
+  api:
+    build: ./api
+    env_file: [.env]
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      flyway: { condition: service_completed_successfully }
+
+  # Python — 공식 API 수집·정규화·base_score (쓰기)
+  collector:
+    build: ./collector
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      flyway: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:

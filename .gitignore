@@ -1,0 +1,38 @@
+# 시크릿 — 저장소 커밋 금지(공공 API 키·FCM·LLM 키)
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/.gitkeep
+*.key
+*-service-account.json
+
+# OS
+.DS_Store
+
+# --- Java / Spring (api/) ---
+api/build/
+api/.gradle/
+api/out/
+*.class
+
+# --- Python (collector/) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+collector/.ipynb_checkpoints/
+
+# --- Web (web/) ---
+web/node_modules/
+web/dist/
+web/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.iml

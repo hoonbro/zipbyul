@@ -1,0 +1,65 @@
+# 집별 enum / 코드 SSOT — 백엔드 기획안 부록 A
+# Python · Spring · 프론트가 이 코드 문자열을 "그대로" 사용한다. 한글은 표시용.
+# 변경 시 이 파일이 단일 출처. 각 스택은 여기서 코드젠/참조한다.
+
+interest_type:    # 관심유형 (목업 9종) — 온보딩·피드·알림 필터
+  - { code: PRIVATE_SALE_SUB,    label: 민간청약,        mvp: true,        match: "supply_type {PRIVATE_SALE, OFFICETEL}" }
+  - { code: UNRANKED_SUB,        label: 무순위 청약,     mvp: true,        match: "supply_type {UNRANKED}" }
+  - { code: HAPPY_HOUSE,         label: 행복주택,        mvp: true,        match: "LH {HAPPY_HOUSE, NATIONAL_RENTAL}" }
+  - { code: YOUTH_SAFE_HOUSE,    label: 청년안심주택,    mvp: false,       match: "SH source — MVP 콘텐츠 없음, 개발 예정 표시" }
+  - { code: LONG_TERM_JEONSE,    label: 장기전세,        mvp: false,       match: "SH source — MVP 콘텐츠 없음, 개발 예정 표시" }
+  - { code: PURCHASE_RENTAL,     label: 매입임대,        mvp: true,        match: "LH {PURCHASE_RENTAL, JEONSE_RENTAL}" }
+  - { code: POLICY_RATE,         label: 정책·금리,       mvp: true,        match: "policy_events(RATE_DECISION); 비기준금리 정책은 2차" }
+  - { code: TRANSACTION,         label: 실거래 등록,     mvp: true,        match: "real_estate_transactions(TRANSACTION_NEW)" }
+  - { code: HOUSE_PRICE_OUTLOOK, label: 집값 전망 심리,  mvp: true,        match: "market_index(HOUSE_PRICE_OUTLOOK_SEOUL_CSI)" }
+
+event_type:       # 이벤트/알림 + 캘린더 단계
+  - { code: ANNOUNCEMENT_NEW,     label: 신규 공고/모집공고, mvp: true }
+  - { code: APPLICATION_START,    label: 접수 시작,          mvp: true }
+  - { code: APPLICATION_DEADLINE, label: 접수 마감,          mvp: true }
+  - { code: DOCUMENT_SUBMIT,      label: 서류제출/서류 마감,  mvp: true }
+  - { code: WINNER_ANNOUNCEMENT,  label: 당첨자 발표,        mvp: true }
+  - { code: CONTRACT,             label: 계약,               mvp: true }
+  - { code: RATE_DECISION,        label: 기준금리 결정,      mvp: true }
+  - { code: TRANSACTION_NEW,      label: 실거래 신규 등록,    mvp: true }
+  - { code: MARKET_INDEX_UPDATED, label: 집값전망 심리 갱신,  mvp: true }
+  - { code: POLICY_ANNOUNCEMENT,  label: 정책 발표,          mvp: false }
+  - { code: NEWS_IMPORTANT,       label: 주요 정책 뉴스,      mvp: false }
+
+supply_type:      # 공급유형
+  - { code: PRIVATE_SALE,    label: 민간분양 }
+  - { code: UNRANKED,        label: 무순위·잔여세대 }
+  - { code: OFFICETEL,       label: 오피스텔·도시형생활주택 }
+  - { code: PUBLIC_SALE,     label: 공공분양 }
+  - { code: HAPPY_HOUSE,     label: LH 행복주택 }
+  - { code: NATIONAL_RENTAL, label: LH 국민임대 }
+  - { code: PURCHASE_RENTAL, label: LH 매입임대 }
+  - { code: JEONSE_RENTAL,   label: LH 전세임대 }
+
+trade_type:       # 실거래
+  - { code: SALE,    label: 매매 }
+  - { code: JEONSE,  label: 전세 }
+  - { code: MONTHLY, label: 월세 }
+
+alert_level:      # 알림 강도 (목업 5종). 기본값 IMPORTANT_ONLY.
+  - { code: ALL,                label: 모든 알림 }
+  - { code: IMPORTANT_ONLY,     label: 중요 알림만, rule: "별 3개↑ = final_score >= 4" }
+  - { code: DEADLINE_ONLY,      label: 마감 임박만, rule: "D-3/D-1/당일 마감" }
+  - { code: REGION_ONLY,        label: 관심지역만 }
+  - { code: DAILY_DIGEST_ONLY,  label: 하루 요약만 }
+# "전체 끄기"는 alert_level 값이 아니라 user_devices.push_enabled=false 로 처리.
+
+index_code:       # 지표
+  - { code: HOUSE_PRICE_OUTLOOK_SEOUL_CSI, label: 집값 전망 심리(서울), mvp: true }
+  - { code: MARKET_TEMP,                   label: 집별 시장온도,        mvp: false }
+  - { code: JEONSE_TEMP,                   label: 전세 온도,            mvp: false }
+
+# 기타 상태값
+source_grade:           [A, B, C]
+collect_type:           [API, RSS, CRAWL, MANUAL, SEED]
+anonymous_user_status:  [ACTIVE, MERGED, DELETED]
+domain_event_status:    [NEW, CLAIMED, DONE, FAILED]
+notification_status:    [SENT, FAILED, SKIPPED, DEDUPED]
+notification_channel:   [PUSH, IN_APP, DIGEST]
+
+timezone: Asia/Seoul   # 저장 timestamptz, 표시/D-day/방해금지/요약 계산은 KST

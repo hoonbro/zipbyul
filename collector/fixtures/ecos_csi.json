@@ -1,0 +1,103 @@
+{
+  "StatisticSearch": {
+    "list_total_count": 6,
+    "row": [
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202501",
+        "DATA_VALUE": "103"
+      },
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202502",
+        "DATA_VALUE": "103"
+      },
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202503",
+        "DATA_VALUE": "112"
+      },
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202504",
+        "DATA_VALUE": "113"
+      },
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202505",
+        "DATA_VALUE": "116"
+      },
+      {
+        "STAT_CODE": "511Y002",
+        "STAT_NAME": "6.2.1. 소비자동향조사(전국, 월, 2008.9~)",
+        "ITEM_CODE1": "FMFB",
+        "ITEM_NAME1": "주택가격전망CSI",
+        "ITEM_CODE2": "F0001",
+        "ITEM_NAME2": "서울",
+        "ITEM_CODE3": null,
+        "ITEM_NAME3": null,
+        "ITEM_CODE4": null,
+        "ITEM_NAME4": null,
+        "UNIT_NAME": null,
+        "WGT": null,
+        "TIME": "202506",
+        "DATA_VALUE": "124"
+      }
+    ]
+  }
+}

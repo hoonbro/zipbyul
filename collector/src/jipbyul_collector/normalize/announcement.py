@@ -116,6 +116,20 @@ def upsert_announcement(
                         gu_name, bjd_code, _SCORE["APPLICATION_DEADLINE"],
                         f"APP_END:{dedup_hash}")
 
+        # 당첨자 발표 (해당일 예약 발행)
+        if winner_d and winner_d >= today:
+            emitter(conn, "WINNER_ANNOUNCEMENT", "ANNOUNCEMENT", ann_id,
+                    gu_name, bjd_code, _SCORE["WINNER_ANNOUNCEMENT"],
+                    f"WINNER:{dedup_hash}",
+                    scheduled_at=str(winner_d))
+
+        # 계약 (해당일 예약 발행)
+        if contract_d and contract_d >= today:
+            emitter(conn, "CONTRACT", "ANNOUNCEMENT", ann_id,
+                    gu_name, bjd_code, _SCORE["CONTRACT"],
+                    f"CONTRACT:{dedup_hash}",
+                    scheduled_at=str(contract_d))
+
         # 통합 캘린더 동기화 (날짜 필드 → calendar_items, 멱등)
         sync_announcement_calendar(
             conn, ann_id, gu_name, apply_start_d, apply_end_d, winner_d, contract_d

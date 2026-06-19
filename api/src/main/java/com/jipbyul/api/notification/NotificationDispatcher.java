@@ -4,6 +4,7 @@ import com.jipbyul.api.common.Times;
 import com.jipbyul.api.notification.push.PushResult;
 import com.jipbyul.api.notification.push.PushSender;
 import com.jipbyul.api.user.InterestMatching;
+import com.jipbyul.api.user.InterestType;
 import java.sql.Array;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -64,7 +65,7 @@ public class NotificationDispatcher {
         LocalDate today = Times.today();
         OffsetDateTime now = OffsetDateTime.now(Times.KST);
 
-        for (Candidate user : candidates()) {
+        for (Candidate user : candidates(event.guName(), eventInterestCode(event, ctx))) {
             boolean regionMatch = event.guName() != null && user.watchGus().contains(event.guName());
             boolean typeMatch = typeMatch(event, ctx, user);
             if (!regionMatch && !typeMatch) {
@@ -287,13 +288,33 @@ public class NotificationDispatcher {
         };
     }
 
-    private List<Candidate> candidates() {
+    /** 이벤트가 매칭되는 관심유형 코드(SQL 선필터용). 매핑 없으면 null. */
+    private String eventInterestCode(OutboxEvent event, EventContext ctx) {
+        return switch (event.eventType()) {
+            case "TRANSACTION_NEW" -> "TRANSACTION";
+            case "RATE_DECISION" -> "POLICY_RATE";
+            case "MARKET_INDEX_UPDATED" -> "HOUSE_PRICE_OUTLOOK";
+            default -> {
+                InterestType mapped = InterestMatching.forSupplyType(ctx.supplyType());
+                yield mapped == null ? null : mapped.name();
+            }
+        };
+    }
+
+    private List<Candidate> candidates(String guName, String interestCode) {
         return jdbcClient.sql("""
                 SELECT up.anonymous_id, up.alert_level, up.interest_types, up.tx_alert_optin,
                        up.daily_digest_enabled, up.daily_digest_time, up.dnd_start, up.dnd_end
                 FROM user_preferences up
                 JOIN anonymous_users au ON au.anonymous_id = up.anonymous_id AND au.status = 'ACTIVE'
+                WHERE (:gu::varchar IS NOT NULL
+                       AND EXISTS (SELECT 1 FROM user_watch_regions w
+                                   WHERE w.anonymous_id = up.anonymous_id AND w.gu_name = :gu::varchar))
+                   OR (:interest::varchar IS NOT NULL
+                       AND :interest::varchar = ANY(up.interest_types))
                 """)
+                .param("gu", guName)
+                .param("interest", interestCode)
                 .query((rs, n) -> {
                     UUID id = rs.getObject("anonymous_id", UUID.class);
                     Array arr = rs.getArray("interest_types");

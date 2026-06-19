@@ -35,8 +35,14 @@ public class TransactionService {
         this.jdbcClient = jdbcClient;
     }
 
-    public RecentTransactionsResponse recent(String region, String dong, int limit) {
-        if (region != null && !region.isBlank()) {
+    public RecentTransactionsResponse recent(String region, String dong, String bjdCode, int limit) {
+        if (bjdCode != null && !bjdCode.isBlank()) {
+            Region resolved = resolveBjd(bjdCode);
+            region = resolved.guName();
+            if (resolved.dongName() != null) {
+                dong = resolved.dongName();   // 동 레벨 코드면 동까지 좁힘
+            }
+        } else if (region != null && !region.isBlank()) {
             requireRegion(region);
         }
 
@@ -64,7 +70,7 @@ public class TransactionService {
     /** 여러 자치구의 최근 등록 실거래 (홈 피드용). 빈 목록이면 전체 기준. */
     public List<Item> recentByRegions(Collection<String> guNames, int limit) {
         if (guNames == null || guNames.isEmpty()) {
-            return recent(null, null, limit).items();
+            return recent(null, null, null, limit).items();
         }
         String literal = "{" + String.join(",", guNames) + "}";
         return jdbcClient.sql(SELECT_PREFIX
@@ -93,6 +99,17 @@ public class TransactionService {
                 rs.getObject("first_seen_at", OffsetDateTime.class),
                 rs.getString("source_name"));
     }
+
+    private Region resolveBjd(String bjdCode) {
+        return jdbcClient.sql("SELECT gu_name, dong_name FROM region_code WHERE bjd_code = :bjd")
+                .param("bjd", bjdCode)
+                .query((rs, n) -> new Region(rs.getString("gu_name"), rs.getString("dong_name")))
+                .optional()
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_REGION,
+                        "지원하지 않는 법정동코드입니다: " + bjdCode));
+    }
+
+    private record Region(String guName, String dongName) {}
 
     private void requireRegion(String guName) {
         int found = jdbcClient.sql("SELECT count(*) FROM region_code WHERE gu_name = :gu")

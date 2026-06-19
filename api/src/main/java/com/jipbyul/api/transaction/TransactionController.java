@@ -20,8 +20,9 @@ public class TransactionController {
     public RecentTransactionsResponse recent(
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String dong,
+            @RequestParam(required = false) String bjdCode,
             @RequestParam(defaultValue = "20") int limit) {
         int bounded = Math.min(Math.max(limit, 1), 100);
-        return service.recent(region, dong, bounded);
+        return service.recent(region, dong, bjdCode, bounded);
     }
 }

@@ -1,7 +1,7 @@
 """housing_announcements 정규화 + upsert + domain_event 발행."""
 import hashlib
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from ..common.db import get_conn
 from .calendar import sync_announcement_calendar

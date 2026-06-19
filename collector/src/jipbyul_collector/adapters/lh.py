@@ -1,8 +1,7 @@
 """LH 분양임대공고 어댑터."""
 import logging
 
-import httpx
-
+from ..common.db import get_conn
 from ..common.settings import SERVICE_KEY
 from ..normalize.announcement import upsert_announcement
 from .base import BaseAdapter
@@ -50,7 +49,10 @@ class LhNoticeAdapter(BaseAdapter):
     source_code = "LH_NOTICE"
 
     def run(self) -> int:
-        items = self._fetch_seoul()
+        items, raw_pages = self._fetch_seoul()
+        with get_conn() as conn:
+            for payload in raw_pages:
+                self.save_raw(conn, payload)
         count = 0
         for item in items:
             is_new = upsert_announcement(
@@ -79,9 +81,9 @@ class LhNoticeAdapter(BaseAdapter):
         logger.info("[%s] 서울 %d건 (신규 %d)", self.source_code, len(items), count)
         return count
 
-    def _fetch_seoul(self) -> list[dict]:
+    def _fetch_seoul(self) -> tuple[list[dict], list[dict]]:
         """서울 공고만 필터링 (CNP_CD_NM 텍스트 기준). 전체 페이지 순회."""
-        seoul, page, pg_sz = [], 1, 100
+        seoul, raw_pages, page, pg_sz = [], [], 1, 100
         while True:
             r = self.client.get(_LIST_URL, params={
                 "serviceKey": SERVICE_KEY,
@@ -90,6 +92,7 @@ class LhNoticeAdapter(BaseAdapter):
             }, timeout=30)
             r.raise_for_status()
             data = r.json()
+            raw_pages.append(data)
             batch = data[1].get("dsList", []) if isinstance(data, list) and len(data) > 1 else []
             total = int(batch[0].get("ALL_CNT", 0)) if batch else 0
 
@@ -98,4 +101,4 @@ class LhNoticeAdapter(BaseAdapter):
             if page * pg_sz >= total:
                 break
             page += 1
-        return seoul
+        return seoul, raw_pages

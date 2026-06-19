@@ -31,7 +31,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: setup-java + ./gradlew test (api/)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: gradlew test
+        working-directory: api
+        run: ./gradlew test --no-daemon
 
   collector:
     needs: changes
@@ -39,7 +46,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: setup-python + pytest/ruff (collector/)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: install
+        working-directory: collector
+        run: pip install -e '.[dev]'
+      - name: ruff
+        working-directory: collector
+        run: ruff check .
+      - name: pytest
+        working-directory: collector
+        run: pytest -q
+
+  db:
+    needs: changes
+    if: ${{ needs.changes.outputs.db == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jipbyul
+          POSTGRES_USER: jipbyul
+          POSTGRES_PASSWORD: jipbyul
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jipbyul"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: flyway migrate (마이그레이션이 깨끗하게 적용되는지 검증)
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}/db/migration:/flyway/sql" \
+            flyway/flyway:10 \
+            -url=jdbc:postgresql://localhost:5432/jipbyul \
+            -user=jipbyul -password=jipbyul -connectRetries=10 migrate
 
   web:
     needs: changes
@@ -47,4 +90,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: setup-node + build/test (web/)
+      # web 스택은 아직 코드 없음 — 추가되면 setup-node + build/test 배선
+      - run: echo "web 스택 미구현 — 스킵"

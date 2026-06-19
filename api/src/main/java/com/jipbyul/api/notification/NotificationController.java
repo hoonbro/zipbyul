@@ -35,6 +35,7 @@ public class NotificationController {
                 SELECT id, domain_event_id, channel, status, final_score, sent_at
                 FROM notification_logs
                 WHERE anonymous_id = :id
+                  AND status IN ('SENT', 'FAILED')
                 ORDER BY sent_at DESC
                 LIMIT :limit
                 """)

@@ -100,7 +100,7 @@ class BaseAdapter(ABC):
                 (event_type, ref_type, ref_id, gu_name, bjd_code,
                  base_score, dedup_hash, scheduled_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, COALESCE(%s::timestamptz, now()))
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (dedup_hash) DO NOTHING
             """,
             (
                 event_type, ref_type, ref_id, gu_name, bjd_code,
@@ -109,14 +109,13 @@ class BaseAdapter(ABC):
             ),
         )
 
-    def save_raw(self, conn, payload: dict) -> None:
+    def save_raw(self, conn, payload: dict, source_code: str | None = None) -> None:
         conn.execute(
             "INSERT INTO raw_payload (source_code, payload) VALUES (%s, %s)",
-            (self.source_code, psycopg_json(payload)),
+            (source_code or self.source_code, psycopg_json(payload)),
         )
 
 
 def psycopg_json(obj):
-    import json as _json
     from psycopg.types.json import Jsonb
     return Jsonb(obj)

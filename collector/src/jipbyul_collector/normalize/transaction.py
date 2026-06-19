@@ -3,8 +3,6 @@ import hashlib
 import logging
 from datetime import date, datetime
 
-from psycopg.types.json import Jsonb
-
 logger = logging.getLogger(__name__)
 
 

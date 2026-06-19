@@ -6,8 +6,11 @@ import com.jipbyul.api.notification.push.PushSender;
 import com.jipbyul.api.user.InterestMatching;
 import java.sql.Array;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -59,6 +62,7 @@ public class NotificationDispatcher {
     private void fanOut(OutboxEvent event) {
         EventContext ctx = enrich(event);
         LocalDate today = Times.today();
+        OffsetDateTime now = OffsetDateTime.now(Times.KST);
 
         for (Candidate user : candidates()) {
             boolean regionMatch = event.guName() != null && user.watchGus().contains(event.guName());
@@ -70,10 +74,57 @@ public class NotificationDispatcher {
             int finalScore = clamp(event.baseScore() + delta, 0, 10);
             Outcome outcome = decide(event, user, regionMatch, finalScore);
             if (outcome == Outcome.IMMEDIATE) {
-                deliver(event, ctx, user, today, finalScore);
+                if (inDnd(now.toLocalTime(), user.dndStart(), user.dndEnd())) {
+                    enqueue(event, user, today, finalScore, "PUSH",
+                            nextAllowedAt(now, user.dndStart(), user.dndEnd()));
+                } else {
+                    deliver(event, ctx, user, today, finalScore);
+                }
+            } else if (outcome == Outcome.DIGEST && user.dailyDigestEnabled()) {
+                enqueue(event, user, today, finalScore, "DIGEST",
+                        nextDigestAt(now, user.dailyDigestTime(), user.dndStart(), user.dndEnd()));
             }
-            // DIGEST/IGNORE: 하루 요약 전달은 다음 슬라이스 (여기선 즉시 발송만)
         }
+    }
+
+    /** DND 종료/하루요약 시각이 지난 예약 알림을 전달한다. 반환 = 클레임한 로그 수. */
+    public int dispatchDue() {
+        jdbcClient.sql("""
+                UPDATE notification_logs
+                SET status='PENDING', claimed_at=NULL
+                WHERE status='CLAIMED' AND claimed_at < now() - interval '5 minutes'
+                """).update();
+
+        List<PendingDelivery> due = jdbcClient.sql("""
+                SELECT nl.id, nl.anonymous_id, nl.domain_event_id, nl.channel, nl.final_score,
+                       de.event_type, de.ref_type, de.ref_id, de.gu_name, de.base_score
+                FROM notification_logs nl
+                JOIN domain_event de ON de.id = nl.domain_event_id
+                JOIN anonymous_users au ON au.anonymous_id = nl.anonymous_id AND au.status = 'ACTIVE'
+                WHERE nl.status = 'PENDING' AND nl.available_at <= now()
+                ORDER BY nl.available_at, nl.id
+                LIMIT 100
+                """)
+                .query((rs, n) -> new PendingDelivery(
+                        rs.getLong("id"),
+                        rs.getObject("anonymous_id", UUID.class),
+                        new OutboxEvent(
+                                rs.getLong("domain_event_id"), rs.getString("event_type"),
+                                rs.getString("ref_type"), rs.getLong("ref_id"),
+                                rs.getString("gu_name"), rs.getInt("base_score")),
+                        rs.getString("channel"), rs.getInt("final_score")))
+                .list();
+
+        List<PendingDelivery> claimed = due.stream().filter(this::claim).toList();
+        claimed.stream()
+                .filter(d -> !"DIGEST".equals(d.channel()))
+                .forEach(d -> deliverClaimed(List.of(d), false));
+
+        Map<UUID, List<PendingDelivery>> digestGroups = claimed.stream()
+                .filter(d -> "DIGEST".equals(d.channel()))
+                .collect(Collectors.groupingBy(PendingDelivery::anonymousId));
+        digestGroups.values().forEach(group -> deliverClaimed(group, true));
+        return claimed.size();
     }
 
     private Outcome decide(OutboxEvent event, Candidate user, boolean regionMatch, int finalScore) {
@@ -93,15 +144,14 @@ public class NotificationDispatcher {
     }
 
     private void deliver(OutboxEvent event, EventContext ctx, Candidate user, LocalDate today, int finalScore) {
-        String dedupKey = user.anonymousId() + "|" + event.eventType() + "|" + event.refType()
-                + "|" + event.refId() + "|" + today;
+        String dedupKey = dedupKey(user.anonymousId(), event, today);
         List<Token> tokens = devices(user.anonymousId());
         String channel = tokens.isEmpty() ? "IN_APP" : "PUSH";
 
         Long logId = jdbcClient.sql("""
                 INSERT INTO notification_logs
-                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score)
-                VALUES (:uid, :eid, :channel, 'SENT', :dedup, :score)
+                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, sent_at)
+                VALUES (:uid, :eid, :channel, 'SENT', :dedup, :score, now())
                 ON CONFLICT (anonymous_id, dedup_key) DO NOTHING
                 RETURNING id
                 """)
@@ -121,16 +171,81 @@ public class NotificationDispatcher {
             return; // IN_APP 알림함 기록만 (status SENT)
         }
 
+        PushAttempt attempt = send(tokens, ctx.title(), ctx.body());
+        if (!attempt.anySuccess()) {
+            jdbcClient.sql("UPDATE notification_logs SET status='FAILED' WHERE id=:id")
+                    .param("id", logId).update();
+            log.warn("푸시 실패 user={} event={} reason={}",
+                    user.anonymousId(), event.id(), attempt.lastReason());
+        }
+    }
+
+    private void enqueue(OutboxEvent event, Candidate user, LocalDate today, int finalScore,
+                         String channel, OffsetDateTime availableAt) {
+        jdbcClient.sql("""
+                INSERT INTO notification_logs
+                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, available_at)
+                VALUES (:uid, :eid, :channel, 'PENDING', :dedup, :score, :availableAt)
+                ON CONFLICT (anonymous_id, dedup_key) DO NOTHING
+                """)
+                .param("uid", user.anonymousId())
+                .param("eid", event.id())
+                .param("channel", channel)
+                .param("dedup", dedupKey(user.anonymousId(), event, today))
+                .param("score", finalScore)
+                .param("availableAt", availableAt)
+                .update();
+    }
+
+    private boolean claim(PendingDelivery delivery) {
+        return jdbcClient.sql("""
+                UPDATE notification_logs SET status='CLAIMED', claimed_at=now()
+                WHERE id=:id AND status='PENDING'
+                """)
+                .param("id", delivery.logId())
+                .update() == 1;
+    }
+
+    private void deliverClaimed(List<PendingDelivery> deliveries, boolean digest) {
+        if (deliveries.isEmpty()) {
+            return;
+        }
+        PendingDelivery first = deliveries.get(0);
+        try {
+            List<Token> tokens = devices(first.anonymousId());
+            if (tokens.isEmpty()) {
+                markDelivery(deliveries, "SENT", true);
+                return;
+            }
+
+            EventContext firstContext = enrich(first.event());
+            String title = digest ? "집별 하루 요약" : firstContext.title();
+            String body = digest
+                    ? deliveries.size() + "개의 새 소식이 있습니다. " + firstContext.body()
+                    : firstContext.body();
+            PushAttempt attempt = send(tokens, title, body);
+            markDelivery(deliveries, attempt.anySuccess() ? "SENT" : "FAILED", false);
+            if (!attempt.anySuccess()) {
+                log.warn("예약 푸시 실패 user={} count={} reason={}",
+                        first.anonymousId(), deliveries.size(), attempt.lastReason());
+            }
+        } catch (RuntimeException e) {
+            markDelivery(deliveries, "FAILED", false);
+            log.error("예약 알림 처리 실패 user={} count={}", first.anonymousId(), deliveries.size(), e);
+        }
+    }
+
+    private PushAttempt send(List<Token> tokens, String title, String body) {
         boolean anySuccess = false;
         String lastReason = null;
         for (Token token : tokens) {
-            PushResult r = pushSender.send(token.token(), ctx.title(), ctx.body());
-            if (r.success()) {
+            PushResult result = pushSender.send(token.token(), title, body);
+            if (result.success()) {
                 anySuccess = true;
                 jdbcClient.sql("UPDATE user_devices SET last_success_at=now(), failure_count=0 WHERE id=:id")
                         .param("id", token.id()).update();
             } else {
-                lastReason = r.failureReason();
+                lastReason = result.failureReason();
                 jdbcClient.sql("""
                         UPDATE user_devices
                         SET last_failure_at=now(), failure_count=failure_count+1,
@@ -139,11 +254,27 @@ public class NotificationDispatcher {
                         """).param("id", token.id()).update();
             }
         }
-        if (!anySuccess) {
-            jdbcClient.sql("UPDATE notification_logs SET status='FAILED' WHERE id=:id")
-                    .param("id", logId).update();
-            log.warn("푸시 실패 user={} event={} reason={}", user.anonymousId(), event.id(), lastReason);
+        return new PushAttempt(anySuccess, lastReason);
+    }
+
+    private void markDelivery(List<PendingDelivery> deliveries, String status, boolean inApp) {
+        for (PendingDelivery delivery : deliveries) {
+            jdbcClient.sql("""
+                    UPDATE notification_logs
+                    SET status=:status, channel=CASE WHEN :inApp THEN 'IN_APP' ELSE channel END,
+                        sent_at=now(), available_at=NULL, claimed_at=NULL
+                    WHERE id=:id AND status='CLAIMED'
+                    """)
+                    .param("status", status)
+                    .param("inApp", inApp)
+                    .param("id", delivery.logId())
+                    .update();
         }
+    }
+
+    private String dedupKey(UUID anonymousId, OutboxEvent event, LocalDate date) {
+        return anonymousId + "|" + event.eventType() + "|" + event.refType()
+                + "|" + event.refId() + "|" + date;
     }
 
     private boolean typeMatch(OutboxEvent event, EventContext ctx, Candidate user) {
@@ -158,7 +289,8 @@ public class NotificationDispatcher {
 
     private List<Candidate> candidates() {
         return jdbcClient.sql("""
-                SELECT up.anonymous_id, up.alert_level, up.interest_types, up.tx_alert_optin
+                SELECT up.anonymous_id, up.alert_level, up.interest_types, up.tx_alert_optin,
+                       up.daily_digest_enabled, up.daily_digest_time, up.dnd_start, up.dnd_end
                 FROM user_preferences up
                 JOIN anonymous_users au ON au.anonymous_id = up.anonymous_id AND au.status = 'ACTIVE'
                 """)
@@ -168,7 +300,11 @@ public class NotificationDispatcher {
                     Set<String> interests = arr == null ? Set.of()
                             : Arrays.stream((String[]) arr.getArray()).collect(Collectors.toSet());
                     return new Candidate(id, rs.getString("alert_level"), interests,
-                            rs.getBoolean("tx_alert_optin"), watchGus(id));
+                            rs.getBoolean("tx_alert_optin"), watchGus(id),
+                            rs.getBoolean("daily_digest_enabled"),
+                            rs.getObject("daily_digest_time", LocalTime.class),
+                            rs.getObject("dnd_start", LocalTime.class),
+                            rs.getObject("dnd_end", LocalTime.class));
                 })
                 .list();
     }
@@ -236,10 +372,49 @@ public class NotificationDispatcher {
         return Math.max(min, Math.min(max, v));
     }
 
+    static boolean inDnd(LocalTime time, LocalTime start, LocalTime end) {
+        if (start == null || end == null || start.equals(end)) {
+            return false;
+        }
+        if (start.isBefore(end)) {
+            return !time.isBefore(start) && time.isBefore(end);
+        }
+        return !time.isBefore(start) || time.isBefore(end);
+    }
+
+    static OffsetDateTime nextAllowedAt(OffsetDateTime now, LocalTime start, LocalTime end) {
+        if (!inDnd(now.toLocalTime(), start, end)) {
+            return now;
+        }
+        LocalDate endDate = now.toLocalDate();
+        if (start.isAfter(end) && !now.toLocalTime().isBefore(start)) {
+            endDate = endDate.plusDays(1);
+        }
+        return endDate.atTime(end).atZone(Times.KST).toOffsetDateTime();
+    }
+
+    static OffsetDateTime nextDigestAt(OffsetDateTime now, LocalTime digestTime,
+                                       LocalTime dndStart, LocalTime dndEnd) {
+        LocalTime effectiveTime = digestTime == null ? LocalTime.of(8, 0) : digestTime;
+        OffsetDateTime scheduled = now.toLocalDate().atTime(effectiveTime)
+                .atZone(Times.KST).toOffsetDateTime();
+        if (!scheduled.isAfter(now)) {
+            scheduled = scheduled.plusDays(1);
+        }
+        return nextAllowedAt(scheduled, dndStart, dndEnd);
+    }
+
     private record Candidate(UUID anonymousId, String alertLevel, Set<String> interestTypes,
-                             boolean txAlertOptin, Set<String> watchGus) {}
+                             boolean txAlertOptin, Set<String> watchGus,
+                             boolean dailyDigestEnabled, LocalTime dailyDigestTime,
+                             LocalTime dndStart, LocalTime dndEnd) {}
 
     private record Token(long id, String token) {}
+
+    private record PendingDelivery(long logId, UUID anonymousId, OutboxEvent event,
+                                   String channel, int finalScore) {}
+
+    private record PushAttempt(boolean anySuccess, String lastReason) {}
 
     private record EventContext(String title, String body, String supplyType) {}
 

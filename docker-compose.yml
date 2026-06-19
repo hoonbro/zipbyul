@@ -40,6 +40,7 @@ services:
     build: ./api
     env_file: [.env]
     ports: ["8080:8080"]
+    volumes: ["./secrets:/run/secrets:ro"]
     depends_on:
       postgres: { condition: service_healthy }
       flyway: { condition: service_completed_successfully }

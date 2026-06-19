@@ -2,8 +2,6 @@
 import logging
 from datetime import date
 
-import httpx
-
 from ..common.settings import ECOS_KEY
 from ..normalize.market_index import upsert_snapshot
 from .base import BaseAdapter
@@ -37,9 +35,11 @@ class EcosAdapter(BaseAdapter):
     def _collect_csi(self, start: str, end: str) -> int:
         """서울 주택가격전망 CSI: 511Y002 / FMFB / F0001"""
         url  = f"{_BASE}/1/100/511Y002/M/{start}/{end}/FMFB/F0001"
-        rows = self._fetch_rows(url)
+        rows, payload = self._fetch_rows(url)
         from ..common.db import get_conn
         count = 0
+        with get_conn() as conn:
+            self.save_raw(conn, payload)
         with get_conn() as conn:
             for row in rows:
                 val = row.get("DATA_VALUE")
@@ -58,9 +58,11 @@ class EcosAdapter(BaseAdapter):
     def _collect_base_rate(self, start: str, end: str) -> int:
         """기준금리: 722Y001 / 0101000"""
         url  = f"{_BASE}/1/100/722Y001/M/{start}/{end}/0101000"
-        rows = self._fetch_rows(url)
+        rows, payload = self._fetch_rows(url)
         from ..common.db import get_conn
         count = 0
+        with get_conn() as conn:
+            self.save_raw(conn, payload)
         with get_conn() as conn:
             for row in rows:
                 val = row.get("DATA_VALUE")
@@ -76,8 +78,8 @@ class EcosAdapter(BaseAdapter):
                     count += 1
         return count
 
-    def _fetch_rows(self, url: str) -> list[dict]:
+    def _fetch_rows(self, url: str) -> tuple[list[dict], dict]:
         r = self.client.get(url, timeout=20)
         r.raise_for_status()
         d = r.json()
-        return d.get("StatisticSearch", {}).get("row", [])
+        return d.get("StatisticSearch", {}).get("row", []), d

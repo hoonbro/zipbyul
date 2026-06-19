@@ -1,6 +1,5 @@
 """market_index_snapshots upsert + MARKET_INDEX_UPDATED / RATE_DECISION 이벤트."""
 import logging
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 

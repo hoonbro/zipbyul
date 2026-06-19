@@ -20,7 +20,7 @@ fcm:
 
 notification:
   consumer:
-    enabled: ${NOTIFICATION_CONSUMER_ENABLED:false}
+    enabled: ${NOTIFICATION_CONSUMER_ENABLED:true}
     batch-size: 100
     max-retry: 5
     poll-interval-ms: 60000

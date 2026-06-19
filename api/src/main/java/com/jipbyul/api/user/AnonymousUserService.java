@@ -55,6 +55,7 @@ public class AnonymousUserService {
     @Transactional
     public void deleteData(UUID anonymousId) {
         requireActive(anonymousId);
+        jdbcClient.sql("DELETE FROM notification_logs WHERE anonymous_id = :id").param("id", anonymousId).update();
         jdbcClient.sql("DELETE FROM user_devices WHERE anonymous_id = :id").param("id", anonymousId).update();
         jdbcClient.sql("DELETE FROM user_watch_regions WHERE anonymous_id = :id").param("id", anonymousId).update();
         jdbcClient.sql("DELETE FROM user_preferences WHERE anonymous_id = :id").param("id", anonymousId).update();

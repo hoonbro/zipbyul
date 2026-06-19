@@ -22,8 +22,9 @@ public class OutboxConsumer {
     @Scheduled(fixedDelayString = "${notification.consumer.poll-interval-ms:60000}")
     public void poll() {
         int processed = dispatcher.runOnce();
-        if (processed > 0) {
-            log.info("알림 워커: 이벤트 {}건 처리", processed);
+        int delivered = dispatcher.dispatchDue();
+        if (processed > 0 || delivered > 0) {
+            log.info("알림 워커: 이벤트 {}건 처리, 예약 알림 {}건 전달", processed, delivered);
         }
     }
 }

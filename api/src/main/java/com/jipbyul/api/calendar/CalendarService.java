@@ -30,11 +30,16 @@ public class CalendarService {
 
         StringBuilder sql = new StringBuilder("""
                 SELECT ci.id, ci.ref_type, ci.ref_id, ci.event_type, ci.gu_name, ci.event_date,
-                       ha.title, ha.supply_type, ha.source_url, sr.name AS source_name
+                       COALESCE(ha.title, pe.title) AS title,
+                       ha.supply_type,
+                       COALESCE(ha.source_url, sr.base_url) AS source_url,
+                       sr.name AS source_name
                 FROM calendar_items ci
                 LEFT JOIN housing_announcements ha
                        ON ci.ref_type = 'ANNOUNCEMENT' AND ha.id = ci.ref_id
-                LEFT JOIN source_registry sr ON sr.source_code = ha.source_code
+                LEFT JOIN policy_events pe
+                       ON ci.ref_type = 'POLICY' AND pe.id = ci.ref_id
+                LEFT JOIN source_registry sr ON sr.source_code = COALESCE(ha.source_code, pe.source_code)
                 WHERE ci.event_date BETWEEN :from AND :to
                 """);
         if (eventType != null && !eventType.isBlank()) {

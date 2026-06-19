@@ -4,8 +4,6 @@ import xml.etree.ElementTree as ET
 from datetime import date
 from itertools import product
 
-import httpx
-
 from ..common.db import get_conn
 from ..common.settings import SERVICE_KEY
 from ..normalize.transaction import upsert_transaction
@@ -93,7 +91,7 @@ class MolitAdapter(BaseAdapter):
         lawd_cd: str, gu_name: str, deal_ymd: str, trade_type: str,
     ) -> int:
         url = f"{_BASE}/{svc_name}/{operation}"
-        items, page = [], 1
+        items, raw_pages, page = [], [], 1
         while True:
             r = self.client.get(url, params={
                 "serviceKey": SERVICE_KEY,
@@ -103,6 +101,10 @@ class MolitAdapter(BaseAdapter):
                 "numOfRows": 1000,
             }, timeout=30)
             r.raise_for_status()
+            raw_pages.append({
+                "request": {"lawdCd": lawd_cd, "dealYmd": deal_ymd, "page": page},
+                "responseXml": r.text,
+            })
             batch = _xml_items(r.text)
             items.extend(batch)
             # 국토부 API는 totalCount가 XML에 포함됨
@@ -114,6 +116,10 @@ class MolitAdapter(BaseAdapter):
 
         bjd_code = _bjd_code_for_gu(lawd_cd)
         new_count = 0
+
+        with get_conn() as conn:
+            for payload in raw_pages:
+                self.save_raw(conn, payload, source_code)
 
         with get_conn() as conn:
             for item in items:

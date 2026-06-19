@@ -75,8 +75,8 @@ def poc_applyhome_apt(client: httpx.Client) -> None:
               f"| 공급지역={item.get('공급지역명')}({item.get('공급지역코드')}) "
               f"| 주택구분={item.get('주택구분코드명')}")
     if items:
-        print(f"  ★ 서울 필터: 공급지역코드=100")
-        print(f"  ★ 공고번호 유일 키 확인: '공고번호' 필드 존재")
+        print("  ★ 서울 필터: 공급지역코드=100")
+        print("  ★ 공고번호 유일 키 확인: '공고번호' 필드 존재")
     RESULTS["applyhome_apt"] = "OK"
 
 
@@ -132,9 +132,9 @@ def poc_lh_notice(client: httpx.Client) -> None:
               f"| 지역={item.get('CNP_CD_NM')} | 유형={item.get('AIS_TP_CD_NM')} | 상태={item.get('PAN_SS')}")
 
     if items:
-        print(f"  ★ 유일키: PAN_ID")
-        print(f"  ★ 지역 매칭: CNP_CD_NM 텍스트 포함 검색 (ARA_CD 파라미터 미작동 확인)")
-        print(f"  ★ 유형 필드: AIS_TP_CD_NM(세부) / UPP_AIS_TP_CD(06=임대, 05=분양)")
+        print("  ★ 유일키: PAN_ID")
+        print("  ★ 지역 매칭: CNP_CD_NM 텍스트 포함 검색 (ARA_CD 파라미터 미작동 확인)")
+        print("  ★ 유형 필드: AIS_TP_CD_NM(세부) / UPP_AIS_TP_CD(06=임대, 05=분양)")
         print(f"  전체 필드: {list(items[0].keys())}")
     RESULTS["lh_notice"] = "OK"
 
@@ -157,14 +157,17 @@ def poc_molit_apt_trade(client: httpx.Client) -> None:
 
     print(f"  총 {total}건")
     for item in items[:3]:
-        print(f"  단지={item.get('aptNm')} | 계약일={item.get('dealYear')}-{item.get('dealMonth')}-{item.get('dealDay')} "
+        deal = f"{item.get('dealYear')}-{item.get('dealMonth')}-{item.get('dealDay')}"
+        print(f"  단지={item.get('aptNm')} | 계약일={deal} "
               f"| 금액(만원)={item.get('dealAmount')} | 법정동={item.get('umdNm')}")
 
     if items:
-        date_keys = [k for k in items[0] if any(x in k.lower() for x in ["date","day","month","year","rgst","reg"])]
+        _date_hints = ["date", "day", "month", "year", "rgst", "reg"]
+        date_keys = [k for k in items[0] if any(x in k.lower() for x in _date_hints)]
         print(f"  날짜 관련 필드: {date_keys}")
         has_reg = "rgstDate" in items[0]
-        print(f"  ★ rgstDate(등록일) 필드: {'있음 ✅ → registered_at 저장 가능' if has_reg else '없음 → first_seen_at diff 전략'}")
+        reg_msg = "있음 ✅ → registered_at 저장 가능" if has_reg else "없음 → first_seen_at diff 전략"
+        print(f"  ★ rgstDate(등록일) 필드: {reg_msg}")
         if has_reg:
             print(f"     샘플값: {items[0].get('rgstDate')} (형식: YY.MM.DD)")
     RESULTS["molit_apt_trade"] = "OK"
@@ -181,13 +184,13 @@ def poc_ecos_csi(client: httpx.Client) -> None:
 
     rows = data.get("StatisticSearch", {}).get("row", []) if isinstance(data, dict) else []
     if not rows:
-        print(f"  ⚠️  응답 확인 필요 → fixtures/ecos_csi.json")
+        print("  ⚠️  응답 확인 필요 → fixtures/ecos_csi.json")
         RESULTS["ecos_csi"] = "WARN: rows empty"
         return
 
     for row in rows:
         print(f"  기준월={row.get('TIME')} | CSI={row.get('DATA_VALUE')} | 항목={row.get('ITEM_NAME1')}")
-    print(f"  ★ statCode=511Y002, itemCode=FMFB(주택가격전망CSI), region=F0001(서울)")
+    print("  ★ statCode=511Y002, itemCode=FMFB(주택가격전망CSI), region=F0001(서울)")
     RESULTS["ecos_csi"] = "OK"
 
 
@@ -202,7 +205,7 @@ def poc_ecos_base_rate(client: httpx.Client) -> None:
 
     rows = data.get("StatisticSearch", {}).get("row", []) if isinstance(data, dict) else []
     if not rows:
-        print(f"  ⚠️  응답 확인 필요 → fixtures/ecos_base_rate.json")
+        print("  ⚠️  응답 확인 필요 → fixtures/ecos_base_rate.json")
         RESULTS["ecos_base_rate"] = "WARN: rows empty"
         return
 

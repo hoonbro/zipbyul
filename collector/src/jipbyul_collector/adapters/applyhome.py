@@ -3,6 +3,7 @@ import logging
 
 import httpx
 
+from ..common.db import get_conn
 from ..common.settings import SERVICE_KEY
 from ..normalize.announcement import upsert_announcement
 from .base import BaseAdapter
@@ -41,8 +42,8 @@ def _map_supply(raw_name: str | None) -> str:
     return "PRIVATE_SALE"
 
 
-def _fetch_all_pages(client: httpx.Client, url: str, extra: dict) -> list[dict]:
-    items, page, per_page = [], 1, 100
+def _fetch_all_pages(client: httpx.Client, url: str, extra: dict) -> tuple[list[dict], list[dict]]:
+    items, raw_pages, page, per_page = [], [], 1, 100
     while True:
         r = client.get(url, params={
             "serviceKey": SERVICE_KEY,
@@ -53,12 +54,13 @@ def _fetch_all_pages(client: httpx.Client, url: str, extra: dict) -> list[dict]:
         }, timeout=30)
         r.raise_for_status()
         d = r.json()
+        raw_pages.append(d)
         batch = d.get("data", [])
         items.extend(batch)
         if len(batch) < per_page:
             break
         page += 1
-    return items
+    return items, raw_pages
 
 
 class ApplyhomeAptAdapter(BaseAdapter):
@@ -66,8 +68,12 @@ class ApplyhomeAptAdapter(BaseAdapter):
 
     def run(self) -> int:
         # 서울만 (공급지역코드=100)
-        items = _fetch_all_pages(self.client, _APT_URL,
-                                 {"cond[공급지역코드::EQ]": _SEOUL_REGION_CODE})
+        items, raw_pages = _fetch_all_pages(
+            self.client, _APT_URL, {"cond[공급지역코드::EQ]": _SEOUL_REGION_CODE}
+        )
+        with get_conn() as conn:
+            for payload in raw_pages:
+                self.save_raw(conn, payload)
         count = 0
         for item in items:
             is_new = upsert_announcement(
@@ -100,7 +106,10 @@ class ApplyhomeUnrankedAdapter(BaseAdapter):
     source_code = "APPLYHOME_UNRANKED"
 
     def run(self) -> int:
-        items = _fetch_all_pages(self.client, _UNRANKED_URL, {})
+        items, raw_pages = _fetch_all_pages(self.client, _UNRANKED_URL, {})
+        with get_conn() as conn:
+            for payload in raw_pages:
+                self.save_raw(conn, payload)
         # 무순위는 공급지역코드 없음 → 공급위치 텍스트로 서울 필터
         seoul_items = [i for i in items if "서울" in (i.get("공급위치") or "")]
         count = 0

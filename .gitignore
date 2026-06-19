@@ -17,6 +17,7 @@ api/out/
 *.class
 
 # --- Python (collector/) ---
+collector/build/
 __pycache__/
 *.py[cod]
 .venv/

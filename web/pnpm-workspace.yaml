@@ -1,0 +1,8 @@
+# pnpm 11 설정 (package.json의 "pnpm" 필드 대체)
+# firebase/protobufjs 빌드 스크립트 허용 (웹 SDK 런타임엔 무해, 미승인 시 install이 에러)
+allowBuilds:
+  '@firebase/util': true
+  msw: true
+  protobufjs: true
+# 스크립트 실행 전 자동 의존성 검증 끄기 (install은 CI/별도 단계로)
+verifyDepsBeforeRun: false

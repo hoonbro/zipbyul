@@ -39,16 +39,33 @@ services:
   api:
     build: ./api
     env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
     ports: ["8080:8080"]
     volumes: ["./secrets:/run/secrets:ro"]
     depends_on:
       postgres: { condition: service_healthy }
       flyway: { condition: service_completed_successfully }
 
+  # web — Vite PWA 정적 서빙 + /v1 → api 리버스 프록시 (같은 origin, CORS 불필요)
+  web:
+    build: ./web
+    ports: ["8081:80"]
+    depends_on: [api]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   # Python — 공식 API 수집·정규화·base_score (쓰기)
   collector:
     build: ./collector
     env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
     depends_on:
       postgres: { condition: service_healthy }
       flyway: { condition: service_completed_successfully }

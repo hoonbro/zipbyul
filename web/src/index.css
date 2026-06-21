@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/* 목업(docs/mockup/…v2.1) 팔레트를 SSOT로 토큰화 */
+@theme {
+  --color-bg: #080b12;
+  --color-surface: #0f1623;
+  --color-surface-2: #11192a;
+  --color-soon: #0e1320; /* 개발 예정 카드 배경 */
+
+  --color-mint: #3df5c5;
+  --color-mint-ink: #06281f; /* 민트 위 텍스트 */
+  --color-amber: #ffce5a;
+  --color-coral: #ff7b88;
+  --color-red: #ff5c6c;
+  --color-sky: #5ba8ff;
+  --color-violet: #9aa7ff; /* 개발 예정 강조 */
+
+  --color-ink: #eaf0f7; /* 본문 강조 */
+  --color-ink-2: #cdd7e4;
+  --color-muted: #8a97ab;
+  --color-muted-2: #5a6678;
+
+  --font-sans: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* 레이더/오버레이 애니메이션 (목업 이식) */
+@keyframes jb-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes jb-blip {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes jb-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes jb-slidein {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes jb-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

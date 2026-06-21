@@ -17,3 +17,17 @@
 - `notebooks/` — 0주차 A등급 5개 API 실호출 검증 노트북
 
 enum/코드는 `../contracts/enums.yaml`(부록 A SSOT)을 따른다.
+
+## 실행 방법 (수동 실행)
+
+현재 디렉토리(`collector/`)에 구성된 파이썬 가상환경을 활성화하여 `collect.py`를 실행할 수 있습니다.
+
+```bash
+# 1. 가상환경 활성화 (필수)
+source .venv/bin/activate
+
+# 2. 실행 옵션
+python collect.py                     # 전체 소스 1회 수집
+python collect.py --source applyhome  # 특정 소스만 수집 (applyhome, lh, molit, ecos)
+python collect.py --schedule          # 데몬 스케줄러 모드로 실행
+```

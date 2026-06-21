@@ -1,0 +1,457 @@
+openapi: 3.1.0
+info:
+  title: 집별 서빙 API
+  version: 0.1.0
+  description: >
+    비회원 개인화 부동산 레이더 MVP API. enum 코드는 enums.yaml(SSOT)을 따른다.
+    모든 시각은 Asia/Seoul. 에러는 공통 envelope(ErrorResponse)을 쓴다.
+servers:
+  - url: http://localhost:8080
+    description: 로컬
+
+tags:
+  - name: user
+    description: 비회원 식별자·설정·기기·삭제
+  - name: serving
+    description: 피드·지표·캘린더·공고·실거래·관심지역
+  - name: notification
+    description: 알림함
+  - name: internal
+    description: 내부 전용(X-Internal-Token 필요)
+
+components:
+  securitySchemes:
+    anonymousId:
+      type: apiKey
+      in: header
+      name: X-Anonymous-Id
+    internalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+  responses:
+    Error400:
+      description: 검증 실패
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Error403:
+      description: 권한 없음 / 내부 전용
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Error404:
+      description: 리소스 없음
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, traceId]
+          properties:
+            code:
+              type: string
+              description: "INVALID_REGION | INVALID_DATE_RANGE | INVALID_ENUM | UNAUTHORIZED | ANONYMOUS_USER_NOT_FOUND | DEVICE_NOT_FOUND | ANNOUNCEMENT_NOT_FOUND | ALREADY_EXISTS | RATE_LIMITED | UPSTREAM_UNAVAILABLE | INTERNAL_ERROR"
+            message: { type: string }
+            traceId: { type: string }
+
+    AnonymousUserResponse:
+      type: object
+      properties:
+        anonymousId: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, MERGED, DELETED] }
+        createdAt: { type: string, format: date-time }
+
+    WatchRegion:
+      type: object
+      required: [guName]
+      properties:
+        guName: { type: string, example: 마포구 }
+        bjdCode: { type: [string, 'null'], description: 법정동코드 10자리(동 좁힘, 선택) }
+
+    PreferencesRequest:
+      type: object
+      required: [alertLevel]
+      properties:
+        alertLevel: { type: string, enum: [ALL, IMPORTANT_ONLY, DEADLINE_ONLY, REGION_ONLY, DAILY_DIGEST_ONLY] }
+        interestTypes:
+          type: array
+          items: { type: string, enum: [PRIVATE_SALE_SUB, UNRANKED_SUB, HAPPY_HOUSE, YOUTH_SAFE_HOUSE, LONG_TERM_JEONSE, PURCHASE_RENTAL, POLICY_RATE, TRANSACTION, HOUSE_PRICE_OUTLOOK] }
+        txAlertOptin: { type: [boolean, 'null'] }
+        dailyDigestEnabled: { type: [boolean, 'null'] }
+        dailyDigestTime: { type: [string, 'null'], format: time, example: '08:00' }
+        dndStart: { type: [string, 'null'], format: time }
+        dndEnd: { type: [string, 'null'], format: time }
+        watchRegions:
+          type: array
+          items: { $ref: '#/components/schemas/WatchRegion' }
+
+    Preferences:
+      type: object
+      properties:
+        anonymousId: { type: string, format: uuid }
+        alertLevel: { type: string }
+        interestTypes: { type: array, items: { type: string } }
+        txAlertOptin: { type: boolean }
+        dailyDigestEnabled: { type: boolean }
+        dailyDigestTime: { type: [string, 'null'] }
+        dndStart: { type: [string, 'null'] }
+        dndEnd: { type: [string, 'null'] }
+        watchRegions: { type: array, items: { $ref: '#/components/schemas/WatchRegion' } }
+        updatedAt: { type: string, format: date-time }
+
+    DeviceRequest:
+      type: object
+      required: [deviceToken]
+      properties:
+        deviceToken: { type: string }
+    DeviceResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        deviceToken: { type: string }
+        pushEnabled: { type: boolean }
+
+    MarketOutlookCard:
+      type: object
+      properties:
+        indexCode: { type: string }
+        name: { type: string }
+        region: { type: string }
+        value: { type: number }
+        band: { type: string }
+        baseMonth: { type: string, example: '2026-05' }
+        sourceName: { type: string }
+        sourceUrl: { type: [string, 'null'] }
+        lastCollectedAt: { type: string, format: date-time }
+        disclaimer: { type: string }
+
+    UrgentEvent:
+      type: object
+      properties:
+        eventId: { type: integer, format: int64 }
+        eventType: { type: string }
+        title: { type: string }
+        regionName: { type: [string, 'null'] }
+        eventDate: { type: string, format: date }
+        dDay: { type: integer }
+        baseScore: { type: integer }
+        stars: { type: integer, minimum: 1, maximum: 5 }
+        sourceName: { type: [string, 'null'] }
+
+    RegionSummaryItem:
+      type: object
+      properties:
+        regionName: { type: string }
+        announcementCount: { type: integer }
+        deadlineCount: { type: integer }
+        recentTransactionCount: { type: integer }
+
+    RecentTransactionItem:
+      type: object
+      properties:
+        transactionId: { type: integer, format: int64 }
+        regionName: { type: string }
+        dong: { type: [string, 'null'] }
+        complexName: { type: [string, 'null'] }
+        tradeType: { type: string, enum: [SALE, JEONSE, MONTHLY] }
+        areaM2: { type: [number, 'null'] }
+        floor: { type: [integer, 'null'] }
+        priceManwon: { type: [integer, 'null'], format: int64 }
+        priceText: { type: [string, 'null'], example: '18.2억' }
+        contractDate: { type: [string, 'null'], format: date }
+        contractMonth: { type: [string, 'null'] }
+        firstSeenAt: { type: string, format: date-time }
+        sourceName: { type: string }
+
+    RecentTransactions:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RecentTransactionItem' } }
+        notice: { type: string }
+
+    FeedHome:
+      type: object
+      properties:
+        baseDate: { type: string, format: date }
+        user:
+          type: object
+          properties:
+            anonymousId: { type: string, format: uuid }
+            watchRegions: { type: array, items: { type: string } }
+            interestTypes: { type: array, items: { type: string } }
+        marketOutlook:
+          oneOf:
+            - $ref: '#/components/schemas/MarketOutlookCard'
+            - type: 'null'
+        urgentEvents: { type: array, items: { $ref: '#/components/schemas/UrgentEvent' } }
+        regionSummary: { type: array, items: { $ref: '#/components/schemas/RegionSummaryItem' } }
+        recentTransactions: { type: array, items: { $ref: '#/components/schemas/RecentTransactionItem' } }
+        dataFreshness:
+          type: object
+          properties:
+            lastSuccessfulCollectAt: { type: [string, 'null'], format: date-time }
+            hasPartialFailure: { type: boolean }
+            notices: { type: array, items: { type: string } }
+
+    HousePriceOutlook:
+      type: object
+      properties:
+        indexCode: { type: string }
+        name: { type: string }
+        region: { type: string }
+        current:
+          type: object
+          properties:
+            baseMonth: { type: string }
+            value: { type: number }
+            band: { type: string }
+            changeFromPrevMonth: { type: [number, 'null'] }
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              baseMonth: { type: string }
+              value: { type: number }
+        source:
+          type: object
+          properties:
+            name: { type: string }
+            provider: { type: string }
+            lastCollectedAt: { type: string, format: date-time }
+        disclaimer: { type: string }
+
+    CalendarItem:
+      type: object
+      properties:
+        eventId: { type: integer, format: int64 }
+        refType: { type: string, enum: [ANNOUNCEMENT, POLICY] }
+        refId: { type: integer, format: int64 }
+        eventType: { type: string }
+        regionName: { type: [string, 'null'] }
+        eventDate: { type: string, format: date }
+        dDay: { type: integer }
+        title: { type: [string, 'null'] }
+        supplyType: { type: [string, 'null'] }
+        sourceName: { type: [string, 'null'] }
+        sourceUrl: { type: [string, 'null'] }
+
+    AnnouncementSummary:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        pblancNo: { type: [string, 'null'] }
+        title: { type: [string, 'null'] }
+        supplyType: { type: [string, 'null'] }
+        regionName: { type: [string, 'null'] }
+        applyStart: { type: [string, 'null'], format: date }
+        applyEnd: { type: [string, 'null'], format: date }
+        winnerAnnounceDate: { type: [string, 'null'], format: date }
+        sourceName: { type: string }
+        sourceUrl: { type: [string, 'null'] }
+
+    AnnouncementList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AnnouncementSummary' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalCount: { type: integer, format: int64 }
+
+    AnnouncementDetail:
+      allOf:
+        - $ref: '#/components/schemas/AnnouncementSummary'
+        - type: object
+          properties:
+            bjdCode: { type: [string, 'null'] }
+            contractDate: { type: [string, 'null'], format: date }
+            summary: { type: object, additionalProperties: true }
+            collectedAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    NotificationLogItem:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        domainEventId: { type: [integer, 'null'], format: int64 }
+        channel: { type: string, enum: [PUSH, IN_APP, DIGEST] }
+        status: { type: string, enum: [SENT, FAILED, SKIPPED, DEDUPED] }
+        finalScore: { type: [integer, 'null'] }
+        sentAt: { type: string, format: date-time }
+
+    SourceHealthItem:
+      type: object
+      properties:
+        sourceCode: { type: string }
+        name: { type: string }
+        grade: { type: string }
+        lastSuccessAt: { type: [string, 'null'], format: date-time }
+        lastFailureAt: { type: [string, 'null'], format: date-time }
+        lastFailureReason: { type: [string, 'null'] }
+        recentCollectCount: { type: integer }
+        displayAvailable: { type: boolean }
+
+paths:
+  /v1/anonymous-users:
+    post:
+      tags: [user]
+      summary: 익명 식별자 발급(+기본 설정 생성)
+      responses:
+        '201':
+          description: 발급됨
+          content: { application/json: { schema: { $ref: '#/components/schemas/AnonymousUserResponse' } } }
+
+  /v1/preferences:
+    get:
+      tags: [user]
+      summary: 설정 조회
+      security: [{ anonymousId: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+    put:
+      tags: [user]
+      summary: 설정 저장/수정(전체 교체 upsert)
+      security: [{ anonymousId: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PreferencesRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/devices:
+    post:
+      tags: [user]
+      summary: 푸시 토큰 등록(upsert)
+      security: [{ anonymousId: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DeviceRequest' } } }
+      responses:
+        '201': { description: 등록됨, content: { application/json: { schema: { $ref: '#/components/schemas/DeviceResponse' } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+  /v1/devices/{id}:
+    delete:
+      tags: [user]
+      summary: 기기 해제(삭제)
+      security: [{ anonymousId: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '204': { description: 삭제됨 }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/me/data:
+    delete:
+      tags: [user]
+      summary: 익명 데이터 삭제(설정·기기·관심지역·알림이력 제거, status=DELETED)
+      security: [{ anonymousId: [] }]
+      responses:
+        '204': { description: 삭제됨 }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/feed/home:
+    get:
+      tags: [serving]
+      summary: 홈 피드 합성
+      security: [{ anonymousId: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FeedHome' } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/market-index/house-price-outlook:
+    get:
+      tags: [serving]
+      summary: 집값 전망 심리(서울 CSI) 현재값+추이
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/HousePriceOutlook' } } } }
+
+  /v1/calendar:
+    get:
+      tags: [serving]
+      summary: 통합 캘린더
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: 기본 오늘 }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 기본 from+30일 }
+        - { name: type, in: query, schema: { type: string }, description: event_type 필터 }
+        - { name: region, in: query, schema: { type: string }, description: 자치구 필터 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CalendarItem' } } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+
+  /v1/announcements:
+    get:
+      tags: [serving]
+      summary: 공고 목록
+      parameters:
+        - { name: region, in: query, schema: { type: string } }
+        - { name: supplyType, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AnnouncementList' } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+  /v1/announcements/{id}:
+    get:
+      tags: [serving]
+      summary: 공고 상세
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AnnouncementDetail' } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/transactions/recent:
+    get:
+      tags: [serving]
+      summary: 실거래 최근 등록(first_seen_at 기준)
+      parameters:
+        - { name: region, in: query, schema: { type: string }, description: 자치구 }
+        - { name: dong, in: query, schema: { type: string }, description: 법정동명 }
+        - { name: bjdCode, in: query, schema: { type: string }, description: 법정동코드(있으면 region/dong 대신 해석) }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecentTransactions' } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+
+  /v1/watch/regions/summary:
+    get:
+      tags: [serving]
+      summary: 관심지역별 공고/마감임박/실거래 집계
+      security: [{ anonymousId: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RegionSummaryItem' } } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/notifications:
+    get:
+      tags: [notification]
+      summary: 앱 내 알림함
+      security: [{ anonymousId: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 30, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NotificationLogItem' } } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /internal/source-health:
+    get:
+      tags: [internal]
+      summary: 데이터 소스 상태
+      security: [{ internalToken: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SourceHealthItem' } } } } }
+        '403': { $ref: '#/components/responses/Error403' }
+
+  /internal/notifications/run-once:
+    post:
+      tags: [internal]
+      summary: 알림 워커 1회 수동 실행
+      security: [{ internalToken: [] }]
+      responses:
+        '200':
+          description: 처리 건수
+          content: { application/json: { schema: { type: object, properties: { processed: { type: integer } } } } }
+        '403': { $ref: '#/components/responses/Error403' }

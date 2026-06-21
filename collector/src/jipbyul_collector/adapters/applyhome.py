@@ -1,4 +1,9 @@
-"""청약홈 APT 분양정보 + 무순위·잔여세대 어댑터 (odcloud)."""
+"""청약홈 APT 분양정보 + 무순위·잔여세대 어댑터 (실시간 ApplyhomeInfoDetailSvc).
+
+서비스: 한국부동산원_청약홈 분양정보 조회 서비스 (data.go.kr 15098547).
+정적 uddi 파일(15101046/15128105)은 업로드 시점 스냅샷이라 신규 공고가
+갱신되지 않아, 실제 청약홈 DB와 연동된 실시간 REST 엔드포인트로 전환.
+"""
 import logging
 
 import httpx
@@ -10,12 +15,14 @@ from .base import BaseAdapter
 
 logger = logging.getLogger(__name__)
 
-# supply_type 매핑 (주택구분코드명 → contracts/enums.yaml supply_type)
+# supply_type 매핑 (주택구분명/상세구분명 → contracts/enums.yaml supply_type)
 _SUPPLY_TYPE_MAP = {
     "APT":          "PRIVATE_SALE",
+    "민영":         "PRIVATE_SALE",
+    "공공분양":     "PUBLIC_SALE",
+    "공공":         "PUBLIC_SALE",
     "오피스텔":     "OFFICETEL",
     "도시형":       "OFFICETEL",
-    "공공분양":     "PUBLIC_SALE",
     "신혼희망타운": "PUBLIC_SALE",
     "국민임대":     "NATIONAL_RENTAL",
     "행복주택":     "HAPPY_HOUSE",
@@ -24,13 +31,15 @@ _SUPPLY_TYPE_MAP = {
     "불법행위":     "UNRANKED",
 }
 
-_SEOUL_REGION_CODE = "100"
+# 실시간 ApplyhomeInfoDetailSvc 엔드포인트
+_BASE         = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1"
+_APT_URL      = f"{_BASE}/getAPTLttotPblancDetail"
+_UNRANKED_URL = f"{_BASE}/getRemndrLttotPblancDetail"
 
-# odcloud 엔드포인트
-_APT_URL     = ("https://api.odcloud.kr/api/15101046/v1"
-                "/uddi:14a46595-03dd-47d3-a418-d64e52820598")
-_UNRANKED_URL = ("https://api.odcloud.kr/api/15128105/v1"
-                 "/uddi:d084bc01-f419-45ac-8555-bcd270c4b656")
+
+def _is_seoul(item: dict) -> bool:
+    """공급지역명에 '서울' 포함 여부 (다지역 공고 '경기,서울,인천' 포함)."""
+    return "서울" in (item.get("SUBSCRPT_AREA_CODE_NM") or "")
 
 
 def _map_supply(raw_name: str | None) -> str:
@@ -43,7 +52,7 @@ def _map_supply(raw_name: str | None) -> str:
 
 
 def _fetch_all_pages(client: httpx.Client, url: str, extra: dict) -> tuple[list[dict], list[dict]]:
-    items, raw_pages, page, per_page = [], [], 1, 100
+    items, raw_pages, page, per_page = [], [], 1, 1000
     while True:
         r = client.get(url, params={
             "serviceKey": SERVICE_KEY,
@@ -67,38 +76,39 @@ class ApplyhomeAptAdapter(BaseAdapter):
     source_code = "APPLYHOME_APT"
 
     def run(self) -> int:
-        # 서울만 (공급지역코드=100)
-        items, raw_pages = _fetch_all_pages(
-            self.client, _APT_URL, {"cond[공급지역코드::EQ]": _SEOUL_REGION_CODE}
-        )
+        items, raw_pages = _fetch_all_pages(self.client, _APT_URL, {})
         with get_conn() as conn:
             for payload in raw_pages:
                 self.save_raw(conn, payload)
+        seoul_items = [i for i in items if _is_seoul(i)]
         count = 0
-        for item in items:
+        for item in seoul_items:
             is_new = upsert_announcement(
                 source_code   = self.source_code,
-                source_ref_id = item["공고번호"],
-                pblanc_no     = item.get("공고번호"),
-                title         = item.get("주택명", ""),
-                supply_type   = _map_supply(item.get("주택구분코드명")),
-                gu_name       = _gu_from_addr(item.get("공급위치", "")),
+                source_ref_id = item["PBLANC_NO"],
+                pblanc_no     = item.get("PBLANC_NO"),
+                title         = item.get("HOUSE_NM", ""),
+                supply_type   = _map_supply(item.get("HOUSE_DTL_SECD_NM")
+                                            or item.get("HOUSE_SECD_NM")),
+                gu_name       = _gu_from_addr(item.get("HSSPLY_ADRES", "")),
                 bjd_code      = None,
-                apply_start   = item.get("청약접수시작일"),
-                apply_end     = item.get("청약접수종료일"),
-                winner_date   = item.get("당첨자발표일"),
-                contract_date = item.get("계약시작일"),
-                source_url    = item.get("모집공고홈페이지주소"),
+                apply_start   = item.get("RCEPT_BGNDE"),
+                apply_end     = item.get("RCEPT_ENDDE"),
+                winner_date   = item.get("PRZWNER_PRESNATN_DE"),
+                contract_date = item.get("CNTRCT_CNCLS_BGNDE"),
+                source_url    = item.get("PBLANC_URL"),
                 summary_json  = {
-                    "공급규모":  item.get("공급규모"),
-                    "입주예정월": item.get("입주예정월"),
-                    "사업주체":  item.get("사업주체명_시행사"),
+                    "공급규모":  item.get("TOT_SUPLY_HSHLDCO"),
+                    "입주예정월": item.get("MVN_PREARNGE_YM"),
+                    "사업주체":  item.get("BSNS_MBY_NM"),
+                    "시공사":    item.get("CNSTRCT_ENTRPS_NM"),
                 },
                 emitter       = self.emit_event,
             )
             if is_new:
                 count += 1
-        logger.info("[%s] %d건 upsert (신규 %d)", self.source_code, len(items), count)
+        logger.info("[%s] 서울 %d/%d건 upsert (신규 %d)",
+                    self.source_code, len(seoul_items), len(items), count)
         return count
 
 
@@ -110,24 +120,26 @@ class ApplyhomeUnrankedAdapter(BaseAdapter):
         with get_conn() as conn:
             for payload in raw_pages:
                 self.save_raw(conn, payload)
-        # 무순위는 공급지역코드 없음 → 공급위치 텍스트로 서울 필터
-        seoul_items = [i for i in items if "서울" in (i.get("공급위치") or "")]
+        seoul_items = [i for i in items if _is_seoul(i)]
         count = 0
         for item in seoul_items:
             is_new = upsert_announcement(
                 source_code   = self.source_code,
-                source_ref_id = item["공고번호"],
-                pblanc_no     = item.get("공고번호"),
-                title         = item.get("주택명", ""),
-                supply_type   = _map_supply(item.get("주택구분코드명")),
-                gu_name       = _gu_from_addr(item.get("공급위치", "")),
+                source_ref_id = item["PBLANC_NO"],
+                pblanc_no     = item.get("PBLANC_NO"),
+                title         = item.get("HOUSE_NM", ""),
+                supply_type   = _map_supply(item.get("HOUSE_SECD_NM")),
+                gu_name       = _gu_from_addr(item.get("HSSPLY_ADRES", "")),
                 bjd_code      = None,
-                apply_start   = item.get("일반공급접수시작일") or item.get("청약접수시작일"),
-                apply_end     = item.get("일반공급접수종료일") or item.get("청약접수종료일"),
-                winner_date   = item.get("당첨자발표일"),
-                contract_date = item.get("계약시작일"),
-                source_url    = item.get("모집공고홈페이지주소"),
-                summary_json  = {"공급위치": item.get("공급위치")},
+                apply_start   = item.get("SUBSCRPT_RCEPT_BGNDE") or item.get("GNRL_RCEPT_BGNDE"),
+                apply_end     = item.get("SUBSCRPT_RCEPT_ENDDE") or item.get("GNRL_RCEPT_ENDDE"),
+                winner_date   = item.get("PRZWNER_PRESNATN_DE"),
+                contract_date = item.get("CNTRCT_CNCLS_BGNDE"),
+                source_url    = item.get("PBLANC_URL"),
+                summary_json  = {
+                    "공급위치":   item.get("HSSPLY_ADRES"),
+                    "총공급세대수": item.get("TOT_SUPLY_HSHLDCO"),
+                },
                 emitter       = self.emit_event,
             )
             if is_new:

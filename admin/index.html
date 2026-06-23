@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>집별 운영 콘솔</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px; max-width: 1000px; margin: 0 auto;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b0e14; color: #cdd7e4;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: #6b7688; font-size: 12px; margin-bottom: 20px; }
+    section { background: #131825; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h2 { font-size: 14px; margin: 0 0 12px; color: #9aa7ff; }
+    label { font-size: 12px; color: #8a97ab; }
+    input {
+      background: #0b0e14; border: 1px solid rgba(255,255,255,.12); color: #e7edf5;
+      border-radius: 8px; padding: 8px 10px; font: inherit; width: 320px; max-width: 100%;
+    }
+    button {
+      background: #3df5c5; color: #04201a; border: 0; border-radius: 8px;
+      padding: 7px 12px; font: inherit; font-weight: 700; cursor: pointer; margin: 2px;
+    }
+    button.ghost { background: #1d2435; color: #cdd7e4; border: 1px solid rgba(255,255,255,.12); }
+    button:disabled { opacity: .5; cursor: default; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.06); white-space: nowrap; }
+    th { color: #6b7688; font-weight: 600; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+    .PENDING { background: rgba(255,206,90,.15); color: #ffce5a; }
+    .RUNNING { background: rgba(91,168,255,.15); color: #5ba8ff; }
+    .SUCCESS { background: rgba(61,245,197,.15); color: #3df5c5; }
+    .FAILED  { background: rgba(255,123,136,.15); color: #ff7b88; }
+    .muted { color: #6b7688; }
+    #msg { font-size: 12px; min-height: 16px; color: #ff7b88; }
+    .ok { color: #3df5c5 !important; }
+  </style>
+</head>
+<body>
+  <h1>집별 운영 콘솔</h1>
+  <div class="sub">내부 전용 · /internal API (X-Internal-Token 필요)</div>
+
+  <section>
+    <h2>인증</h2>
+    <div class="row">
+      <label for="token">X-Internal-Token</label>
+      <input id="token" type="password" placeholder="내부 토큰 입력" autocomplete="off" />
+      <button id="saveToken">저장</button>
+      <span id="msg"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>수기 배치</h2>
+    <div class="row">
+      <span class="muted">수집 실행:</span>
+      <button class="run-collect" data-source="applyhome">applyhome</button>
+      <button class="run-collect" data-source="lh">lh</button>
+      <button class="run-collect" data-source="molit">molit</button>
+      <button class="run-collect" data-source="ecos">ecos</button>
+      <button class="ghost" id="runNotif">알림 워커 1회 실행</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>소스 헬스 <button class="ghost" id="refreshHealth" style="float:right">새로고침</button></h2>
+    <table id="health"><thead><tr>
+      <th>소스</th><th>등급</th><th>최근 성공</th><th>최근 실패</th><th>실패 사유</th><th>건수</th><th>노출</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>수집 잡 <span class="muted" style="font-size:11px">· 3초 자동 새로고침</span></h2>
+    <table id="jobs"><thead><tr>
+      <th>#</th><th>소스</th><th>상태</th><th>요청</th><th>시작</th><th>종료</th><th>메시지</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <script>
+    const TOKEN_KEY = 'jb_internal_token';
+    const $ = (s) => document.querySelector(s);
+    const msg = $('#msg');
+
+    function getToken() { return sessionStorage.getItem(TOKEN_KEY) || ''; }
+    $('#token').value = getToken();
+
+    function note(text, ok) {
+      msg.textContent = text;
+      msg.classList.toggle('ok', !!ok);
+    }
+
+    async function api(path, opts = {}) {
+      const token = getToken();
+      if (!token) { note('토큰을 먼저 입력하세요.'); throw new Error('no token'); }
+      const res = await fetch(path, {
+        method: opts.method || 'GET',
+        headers: {
+          'X-Internal-Token': token,
+          ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!res.ok) {
+        const m = (data && data.error && data.error.message) || res.statusText;
+        throw new Error(m);
+      }
+      return data;
+    }
+
+    const fmt = (s) => s ? s.replace('T', ' ').slice(5, 19) : '—';
+
+    async function loadHealth() {
+      try {
+        const rows = await api('/internal/source-health');
+        $('#health tbody').innerHTML = rows.map((r) => `
+          <tr>
+            <td>${r.name} <span class="muted">${r.sourceCode}</span></td>
+            <td>${r.grade}</td>
+            <td>${fmt(r.lastSuccessAt)}</td>
+            <td>${fmt(r.lastFailureAt)}</td>
+            <td class="muted">${r.lastFailureReason || '—'}</td>
+            <td>${r.recentCollectCount}</td>
+            <td>${r.displayAvailable ? '✓' : '✗'}</td>
+          </tr>`).join('');
+        note('연결됨', true);
+      } catch (e) { note('소스 헬스 로드 실패: ' + e.message); }
+    }
+
+    async function loadJobs() {
+      try {
+        const rows = await api('/internal/admin/collect/jobs?limit=20');
+        $('#jobs tbody').innerHTML = rows.map((j) => `
+          <tr>
+            <td>${j.id}</td>
+            <td>${j.source}</td>
+            <td><span class="tag ${j.status}">${j.status}</span></td>
+            <td class="muted">${fmt(j.requestedAt)}</td>
+            <td class="muted">${fmt(j.startedAt)}</td>
+            <td class="muted">${fmt(j.finishedAt)}</td>
+            <td class="muted">${j.message || '—'}</td>
+          </tr>`).join('');
+      } catch (e) { /* 토큰 없거나 오류 — 헬스 쪽 메시지로 충분 */ }
+    }
+
+    $('#saveToken').onclick = () => {
+      sessionStorage.setItem(TOKEN_KEY, $('#token').value.trim());
+      note('토큰 저장됨', true);
+      loadHealth(); loadJobs();
+    };
+    $('#refreshHealth').onclick = loadHealth;
+
+    document.querySelectorAll('.run-collect').forEach((b) => {
+      b.onclick = async () => {
+        try {
+          const j = await api('/internal/admin/collect', { method: 'POST', body: { source: b.dataset.source } });
+          note(`수집 잡 #${j.id} (${j.source}) 큐잉됨`, true);
+          loadJobs();
+        } catch (e) { note('수집 큐잉 실패: ' + e.message); }
+      };
+    });
+
+    $('#runNotif').onclick = async () => {
+      try {
+        const r = await api('/internal/notifications/run-once', { method: 'POST' });
+        note(`알림 워커 실행됨 · processed=${r.processed}`, true);
+      } catch (e) { note('알림 워커 실행 실패: ' + e.message); }
+    };
+
+    if (getToken()) { loadHealth(); loadJobs(); }
+    setInterval(loadJobs, 3000);
+  </script>
+</body>
+</html>

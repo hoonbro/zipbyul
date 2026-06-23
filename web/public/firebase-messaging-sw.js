@@ -4,12 +4,11 @@
 importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-messaging-compat.js')
 
-// TODO: 실제 config로 교체
 firebase.initializeApp({
-  apiKey: 'REPLACE_ME',
+  apiKey: 'AIzaSyCQ1XqA8iLFZz4CzOWI0e7ZbC4pcBXctZw',
   projectId: 'zipbyul',
-  messagingSenderId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
+  messagingSenderId: '948368663536',
+  appId: '1:948368663536:web:ea3de55fae31389dde7335',
 })
 
 firebase.messaging()

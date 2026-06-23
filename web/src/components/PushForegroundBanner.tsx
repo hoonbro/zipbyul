@@ -26,7 +26,7 @@ export default function PushForegroundBanner() {
     return null
   }
   return (
-    <div className="fixed left-1/2 top-2 z-50 w-[94%] max-w-[410px] -translate-x-1/2 rounded-2xl border border-mint/30 bg-surface-2 p-3 shadow-lg">
+    <div className="fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_8px)] z-50 w-[94%] max-w-[410px] -translate-x-1/2 rounded-2xl border border-mint/30 bg-surface-2 p-3 shadow-lg">
       <p className="text-sm font-semibold text-ink">{toast.title}</p>
       {toast.body && <p className="text-xs text-muted">{toast.body}</p>}
     </div>

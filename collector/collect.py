@@ -50,8 +50,11 @@ def run_all(source_filter: str | None = None) -> None:
 def run_scheduled() -> None:
     from apscheduler.schedulers.blocking import BlockingScheduler
     from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
 
     sched = BlockingScheduler(timezone="Asia/Seoul")
+    # 운영자 수기 수집 잡(collection_job) 폴링 — 30초 간격
+    sched.add_job(drain_collection_jobs, IntervalTrigger(seconds=30), id="manual_collect_drain")
     # 청약홈 / LH — 1일 2회 (08:00, 20:00)
     sched.add_job(lambda: run_all("applyhome"), CronTrigger(hour="8,20", minute=0))
     sched.add_job(lambda: run_all("lh"),        CronTrigger(hour="8,20", minute=5))
@@ -67,6 +70,46 @@ def run_scheduled() -> None:
         pass
     finally:
         close_pool()
+
+
+def drain_collection_jobs() -> None:
+    """PENDING 수집 잡을 1건 집어 실행한다(운영자 수기 트리거). 스케줄러가 주기 호출."""
+    from jipbyul_collector.common.db import get_conn
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, source FROM collection_job
+            WHERE status = 'PENDING'
+            ORDER BY requested_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return
+        job_id, source = row["id"], row["source"]
+        conn.execute(
+            "UPDATE collection_job SET status='RUNNING', started_at=now() WHERE id=%s",
+            (job_id,),
+        )
+        conn.commit()
+
+    logger.info("▶ 수기 수집 잡 #%s (%s) 시작", job_id, source)
+    try:
+        run_all(source)
+        status, message = "SUCCESS", None
+    except Exception as e:  # noqa: BLE001 — 잡 실패는 기록하고 스케줄러는 계속
+        status, message = "FAILED", str(e)[:500]
+        logger.exception("수기 수집 잡 #%s 실패", job_id)
+
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE collection_job SET status=%s, finished_at=now(), message=%s WHERE id=%s",
+            (status, message, job_id),
+        )
+        conn.commit()
+    logger.info("✓ 수기 수집 잡 #%s → %s", job_id, status)
 
 
 def backfill_calendar() -> None:

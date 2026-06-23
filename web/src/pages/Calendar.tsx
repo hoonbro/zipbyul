@@ -119,19 +119,23 @@ function Badge({ c }: { c: DisplayEvent }) {
       </span>
     )
   }
+  const todayDeadline = !a && c.eventType === 'APPLICATION_DEADLINE' && c.dDay === 0
   return (
     <>
       <DDayBadge dDay={c.dDay} />
       {a?.ongoing && <span className={chipCls}>접수중</span>}
+      {todayDeadline && <span className={chipCls}>오늘마감</span>}
     </>
   )
 }
 
 function EventCard({ c }: { c: DisplayEvent }) {
   const isAnn = c.refType === 'ANNOUNCEMENT' && c.refId != null
-  const isReception = c.apply != null
-  const tagColor = isReception ? '#3df5c5' : eventTagColor(c.eventType)
-  const tagLabel = isReception ? '접수' : EVENT_TYPE_LABELS[c.eventType] ?? c.eventType
+  // 접수마감 단독 이벤트도 접수 카드로 취급. 마감일이 지난 것만 '접수 마감'으로 표기.
+  const isReception = c.apply != null || c.eventType === 'APPLICATION_DEADLINE'
+  const closed = isReception && c.dDay < 0
+  const tagColor = isReception ? (closed ? '#8a97ab' : '#3df5c5') : eventTagColor(c.eventType)
+  const tagLabel = isReception ? (closed ? '접수 마감' : '접수') : EVENT_TYPE_LABELS[c.eventType] ?? c.eventType
   const dateText = c.apply && !c.apply.sameDay ? `${c.apply.startDate.slice(5)} ~ ${c.eventDate.slice(5)}` : c.eventDate.slice(5)
   const cardCls = `flex items-stretch gap-3 rounded-[15px] border border-white/[0.06] bg-surface p-3.5${c.dDay < 0 ? ' opacity-60' : ''}`
   const inner = (

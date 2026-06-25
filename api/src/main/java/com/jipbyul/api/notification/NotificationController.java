@@ -32,7 +32,7 @@ public class NotificationController {
         anonymousUserService.requireActive(anonymousId);
         int bounded = Math.min(Math.max(limit, 1), 100);
         return jdbcClient.sql("""
-                SELECT id, domain_event_id, channel, status, final_score, sent_at
+                SELECT id, domain_event_id, channel, status, final_score, sent_at, title, body
                 FROM notification_logs
                 WHERE anonymous_id = :id
                   AND status IN ('SENT', 'FAILED')
@@ -47,7 +47,9 @@ public class NotificationController {
                         rs.getString("channel"),
                         rs.getString("status"),
                         (Integer) rs.getObject("final_score"),
-                        rs.getObject("sent_at", OffsetDateTime.class)))
+                        rs.getObject("sent_at", OffsetDateTime.class),
+                        rs.getString("title"),
+                        rs.getString("body")))
                 .list();
     }
 }

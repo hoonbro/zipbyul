@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import DDayBadge from '../components/DDayBadge'
-import { ddayLook, eventTagColor } from '../lib/colors'
-import { EVENT_TYPE_LABELS } from '../lib/constants'
+import { ddayLook, eventTag } from '../lib/colors'
 import { useCalendar } from '../lib/hooks'
 import type { CalendarItem } from '../lib/types'
 
@@ -101,6 +100,31 @@ const ddText = (n: number) => (n === 0 ? '오늘' : n > 0 ? `D-${n}` : `D+${-n}`
 
 const chipCls = 'rounded-md bg-mint/15 px-1.5 py-0.5 text-[10px] font-bold text-mint'
 
+// 안전마진 등급 배지 (A안: 태그 줄). 기획안 §5.
+const GRADE_BADGE: Record<string, { label: string; fg: string; bg: string }> = {
+  HIGH: { label: '🟢 안전마진 높음', fg: '#3df5c5', bg: 'rgba(61,245,197,0.15)' },
+  MID: { label: '🟡 안전마진 보통', fg: '#ffce5a', bg: 'rgba(255,206,90,0.15)' },
+  LOW: { label: '마진 낮음', fg: '#8a97ab', bg: 'rgba(138,151,171,0.15)' },
+  UNAVAILABLE: { label: '비교 데이터 부족', fg: '#8a97ab', bg: 'rgba(138,151,171,0.12)' },
+}
+const clueCls = 'rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-muted-2'
+
+function MarginBadges({ c }: { c: DisplayEvent }) {
+  const g = c.marginGrade ? GRADE_BADGE[c.marginGrade] : null
+  if (!g && !c.priceCap && !c.unranked) return null
+  return (
+    <>
+      {g && (
+        <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ color: g.fg, background: g.bg }}>
+          {g.label}
+        </span>
+      )}
+      {c.priceCap && <span className={clueCls}>분상제</span>}
+      {c.unranked && <span className={clueCls}>무순위</span>}
+    </>
+  )
+}
+
 function Badge({ c }: { c: DisplayEvent }) {
   const a = c.apply
   if (a?.sameDay) {
@@ -133,20 +157,19 @@ function EventCard({ c }: { c: DisplayEvent }) {
   const isAnn = c.refType === 'ANNOUNCEMENT' && c.refId != null
   // 접수마감 단독 이벤트도 접수 카드로 취급. 마감일이 지난 것만 '접수 마감'으로 표기.
   const isReception = c.apply != null || c.eventType === 'APPLICATION_DEADLINE'
-  const closed = isReception && c.dDay < 0
-  const tagColor = isReception ? (closed ? '#8a97ab' : '#3df5c5') : eventTagColor(c.eventType)
-  const tagLabel = isReception ? (closed ? '접수 마감' : '접수') : EVENT_TYPE_LABELS[c.eventType] ?? c.eventType
+  const { label: tagLabel, color: tagColor } = eventTag(c.eventType, c.dDay, isReception)
   const dateText = c.apply && !c.apply.sameDay ? `${c.apply.startDate.slice(5)} ~ ${c.eventDate.slice(5)}` : c.eventDate.slice(5)
   const cardCls = `flex items-stretch gap-3 rounded-[15px] border border-white/[0.06] bg-surface p-3.5${c.dDay < 0 ? ' opacity-60' : ''}`
   const inner = (
     <>
       <span className="w-[3px] shrink-0 rounded-full" style={{ background: GROUP_COLOR[itemGroup(c) ?? ''] ?? '#8a97ab' }} />
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-1.5">
+        <div className="mb-1 flex flex-wrap items-center gap-1.5">
           <span className="inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ color: tagColor, background: `${tagColor}22` }}>
             {tagLabel}
           </span>
           {c.regionName && <span className="text-xs text-muted-2">{c.regionName}</span>}
+          <MarginBadges c={c} />
         </div>
         <div className="mb-1.5 truncate text-[15px] font-semibold">{c.title ?? '(제목 없음)'}</div>
         <div className="flex items-center gap-2 text-[11px] text-muted">

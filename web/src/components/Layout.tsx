@@ -51,12 +51,12 @@ export default function Layout() {
   return (
     <div className="mx-auto flex h-full max-w-[430px] flex-col bg-bg">
       <PushForegroundBanner />
-      <main className="flex-1 overflow-y-auto px-[18px] pt-[calc(env(safe-area-inset-top)_+_8px)] pb-[calc(env(safe-area-inset-bottom)_+_6rem)]">
+      <main className="flex-1 overflow-y-auto px-[18px] pt-[calc(env(safe-area-inset-top)_+_8px)] pb-[4.75rem]">
         <Suspense fallback={<p className="text-sm text-muted-2">불러오는 중…</p>}>
           <Outlet />
         </Suspense>
       </main>
-      <nav className="fixed bottom-0 left-1/2 flex h-[calc(68px_+_env(safe-area-inset-bottom))] w-full max-w-[430px] -translate-x-1/2 border-t border-white/[0.07] bg-bg/90 pb-[calc(env(safe-area-inset-bottom)_+_6px)] backdrop-blur-md">
+      <nav className="fixed bottom-0 left-1/2 flex h-[68px] w-full max-w-[430px] -translate-x-1/2 border-t border-white/[0.07] bg-bg/90 pb-3 backdrop-blur-md">
         {tabs.map((t) => (
           <NavLink
             key={t.to}

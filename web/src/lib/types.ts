@@ -46,6 +46,8 @@ export interface NotificationLogItem {
   status: string
   finalScore: number | null
   sentAt: string
+  title: string | null
+  body: string | null
 }
 
 export interface RecentTransaction {
@@ -100,6 +102,30 @@ export interface CalendarItem {
   supplyType: string | null
   sourceName: string | null
   sourceUrl: string | null
+  marginGrade: string | null
+  priceCap: boolean | null
+  unranked: boolean | null
+}
+
+export interface UnitMargin {
+  houseType: string | null
+  areaM2: number | null
+  supplyAmountManwon: number | null
+  marketMedianManwon: number | null
+  marginManwon: number | null
+  marginRatio: number | null
+  grade: string
+  sampleCount: number
+}
+
+export interface AnnouncementMargin {
+  announcementId: number
+  priceCap: boolean
+  unranked: boolean
+  representativeGrade: string
+  basisRegion: string
+  basisMonths: number
+  units: UnitMargin[]
 }
 
 export interface AnnouncementSummary {
@@ -128,6 +154,7 @@ export interface AnnouncementDetail extends AnnouncementSummary {
   summary: Record<string, unknown>
   collectedAt: string
   updatedAt: string
+  margin: AnnouncementMargin | null
 }
 
 export interface Preferences {

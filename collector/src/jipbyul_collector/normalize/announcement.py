@@ -50,6 +50,7 @@ def upsert_announcement(
     source_url: str | None,
     summary_json: dict,
     emitter,  # BaseAdapter.emit_event
+    price_cap_yn: bool | None = None,  # 분양가상한제 (로또 단서). 안전마진 §2-1
 ) -> bool:
     """
     Returns True if this was a new INSERT (→ ANNOUNCEMENT_NEW 이벤트 발행).
@@ -70,24 +71,25 @@ def upsert_announcement(
                 (source_code, source_ref_id, pblanc_no, title, supply_type,
                  gu_name, bjd_code, apply_start, apply_end,
                  winner_announce_date, contract_date,
-                 source_url, summary_json, dedup_hash)
+                 source_url, summary_json, price_cap_yn, dedup_hash)
             VALUES
                 (%s, %s, %s, %s, %s,
                  %s, %s, %s, %s,
                  %s, %s,
-                 %s, %s, %s)
+                 %s, %s, %s, %s)
             ON CONFLICT (dedup_hash) DO UPDATE
-                SET title       = EXCLUDED.title,
-                    apply_start = EXCLUDED.apply_start,
-                    apply_end   = EXCLUDED.apply_end,
-                    updated_at  = now()
+                SET title        = EXCLUDED.title,
+                    apply_start  = EXCLUDED.apply_start,
+                    apply_end    = EXCLUDED.apply_end,
+                    price_cap_yn = EXCLUDED.price_cap_yn,
+                    updated_at   = now()
             RETURNING id, (xmax = 0) AS is_insert
             """,
             (
                 source_code, source_ref_id, pblanc_no, title, supply_type,
                 gu_name, bjd_code, apply_start_d, apply_end_d,
                 winner_d, contract_d,
-                source_url, Jsonb(summary_json), dedup_hash,
+                source_url, Jsonb(summary_json), price_cap_yn, dedup_hash,
             ),
         ).fetchone()
 

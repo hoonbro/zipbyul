@@ -1,5 +1,7 @@
 // 목업 catColor()·dday() 규칙을 실데이터 라벨에 맞춘 색 헬퍼.
 
+import { EVENT_TYPE_LABELS } from './constants'
+
 export const PALETTE = {
   mint: '#3df5c5',
   amber: '#ffce5a',
@@ -36,6 +38,22 @@ export function eventTagColor(eventType: string): string {
     default:
       return '#8a97ab'
   }
+}
+
+/**
+ * 이벤트 태그 라벨+색 (캘린더 기준 SSOT). 접수는 진행 중='접수'(민트)·마감='접수 마감'(슬레이트),
+ * 그 외는 타입 라벨 + eventTagColor. reception 기본값은 접수마감 타입 단독 판정(레이더용).
+ */
+export function eventTag(
+  eventType: string,
+  dDay: number,
+  reception = eventType === 'APPLICATION_DEADLINE',
+): { label: string; color: string } {
+  if (reception) {
+    const closed = dDay < 0
+    return { label: closed ? '접수 마감' : '접수', color: closed ? '#8a97ab' : '#3df5c5' }
+  }
+  return { label: EVENT_TYPE_LABELS[eventType] ?? eventType, color: eventTagColor(eventType) }
 }
 
 export interface DdayLook {

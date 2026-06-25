@@ -11,6 +11,7 @@ import httpx
 from ..common.db import get_conn
 from ..common.settings import SERVICE_KEY
 from ..normalize.announcement import upsert_announcement
+from ..normalize.announcement_unit import upsert_units
 from .base import BaseAdapter
 
 logger = logging.getLogger(__name__)
@@ -32,9 +33,23 @@ _SUPPLY_TYPE_MAP = {
 }
 
 # 실시간 ApplyhomeInfoDetailSvc 엔드포인트
-_BASE         = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1"
-_APT_URL      = f"{_BASE}/getAPTLttotPblancDetail"
-_UNRANKED_URL = f"{_BASE}/getRemndrLttotPblancDetail"
+_BASE             = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1"
+_APT_URL          = f"{_BASE}/getAPTLttotPblancDetail"
+_UNRANKED_URL     = f"{_BASE}/getRemndrLttotPblancDetail"
+# 주택형별 분양가(안전마진 §2-2). 헤더와 같은 서비스(15098547), 같은 서비스키.
+_APT_MDL_URL      = f"{_BASE}/getAPTLttotPblancMdl"
+_UNRANKED_MDL_URL = f"{_BASE}/getRemndrLttotPblancMdl"
+
+# 청약홈 ApplyhomeInfoDetailSvc 주택형별(Mdl) 표준 필드. 안전마진 §3·§8.
+# 분양가 LTTOT_TOP_AMOUNT(분양최고금액)는 이 API에서 만원 단위 → 그대로 적재.
+# 첫 라이브 실행 때 키만 sanity-check(틀려도 NULL→'산출 불가'로 비활성).
+_MDL_FIELDS = {
+    "pblanc_no":            "PBLANC_NO",
+    "house_type":           "HOUSE_TY",         # 주택형 (예: 059.9500A)
+    "area_m2":              "SUPLY_AR",          # 전용면적
+    "supply_count":         "SUPLY_HSHLDCO",     # 공급세대수
+    "supply_amount_manwon": "LTTOT_TOP_AMOUNT",  # 분양최고금액(만원)
+}
 
 
 def _is_seoul(item: dict) -> bool:
@@ -104,11 +119,15 @@ class ApplyhomeAptAdapter(BaseAdapter):
                     "시공사":    item.get("CNSTRCT_ENTRPS_NM"),
                 },
                 emitter       = self.emit_event,
+                price_cap_yn  = _price_cap(item),
             )
             if is_new:
                 count += 1
-        logger.info("[%s] 서울 %d/%d건 upsert (신규 %d)",
-                    self.source_code, len(seoul_items), len(items), count)
+
+        seoul_pnos = {str(i["PBLANC_NO"]) for i in seoul_items}
+        unit_count = _collect_units(self.client, _APT_MDL_URL, self.source_code, seoul_pnos)
+        logger.info("[%s] 서울 %d/%d건 upsert (신규 %d), 주택형 %d건",
+                    self.source_code, len(seoul_items), len(items), count, unit_count)
         return count
 
 
@@ -141,11 +160,15 @@ class ApplyhomeUnrankedAdapter(BaseAdapter):
                     "총공급세대수": item.get("TOT_SUPLY_HSHLDCO"),
                 },
                 emitter       = self.emit_event,
+                price_cap_yn  = _price_cap(item),
             )
             if is_new:
                 count += 1
-        logger.info("[%s] 서울 %d/%d건 (신규 %d)",
-                    self.source_code, len(seoul_items), len(items), count)
+
+        seoul_pnos = {str(i["PBLANC_NO"]) for i in seoul_items}
+        unit_count = _collect_units(self.client, _UNRANKED_MDL_URL, self.source_code, seoul_pnos)
+        logger.info("[%s] 서울 %d/%d건 (신규 %d), 주택형 %d건",
+                    self.source_code, len(seoul_items), len(items), count, unit_count)
         return count
 
 
@@ -161,3 +184,56 @@ def _gu_from_addr(addr: str) -> str | None:
         if gu in addr:
             return gu
     return None
+
+
+def _price_cap(item: dict) -> bool | None:
+    """헤더 분양가상한제 적용여부 → bool. 영문 PARCPRC_ULS_AT / 한글 '분양가상한제' 둘 다 허용."""
+    for key in ("PARCPRC_ULS_AT", "분양가상한제"):
+        v = item.get(key)
+        if v is not None:
+            return str(v).strip().upper().startswith("Y")
+    return None
+
+
+def _to_num(v) -> float | None:
+    if v in (None, ""):
+        return None
+    try:
+        return float(str(v).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _to_int(v) -> int | None:
+    n = _to_num(v)
+    return int(n) if n is not None else None
+
+
+def _map_mdl_unit(row: dict) -> dict:
+    """청약홈 Mdl 한 행 → announcement_unit 내부 dict. 키는 _MDL_FIELDS로 격리."""
+    f = _MDL_FIELDS
+    return {
+        "house_type":           row.get(f["house_type"]),
+        "area_m2":              _to_num(row.get(f["area_m2"])),
+        "supply_count":         _to_int(row.get(f["supply_count"])),
+        "supply_amount_manwon": _to_int(row.get(f["supply_amount_manwon"])),
+    }
+
+
+def _collect_units(client: httpx.Client, mdl_url: str, source_code: str,
+                   valid_pblanc_nos: set[str]) -> int:
+    """Mdl 응답을 공고번호로 묶어 announcement_unit upsert. 서울 공고만 적재."""
+    rows, _ = _fetch_all_pages(client, mdl_url, {})
+    by_pblanc: dict[str, list[dict]] = {}
+    for r in rows:
+        pno = r.get(_MDL_FIELDS["pblanc_no"])
+        if pno is None:
+            continue
+        by_pblanc.setdefault(str(pno), []).append(r)
+
+    total = 0
+    for pno, raws in by_pblanc.items():
+        if pno not in valid_pblanc_nos:
+            continue
+        total += upsert_units(source_code, pno, [_map_mdl_unit(r) for r in raws])
+    return total

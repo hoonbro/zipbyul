@@ -235,6 +235,32 @@ components:
         supplyType: { type: [string, 'null'] }
         sourceName: { type: [string, 'null'] }
         sourceUrl: { type: [string, 'null'] }
+        marginGrade: { type: [string, 'null'], enum: [HIGH, MID, LOW, UNAVAILABLE, null] }
+        priceCap: { type: [boolean, 'null'] }
+        unranked: { type: [boolean, 'null'] }
+
+    UnitMargin:
+      type: object
+      properties:
+        houseType: { type: [string, 'null'] }
+        areaM2: { type: [number, 'null'] }
+        supplyAmountManwon: { type: [integer, 'null'], format: int64 }
+        marketMedianManwon: { type: [integer, 'null'], format: int64 }
+        marginManwon: { type: [integer, 'null'], format: int64 }
+        marginRatio: { type: [number, 'null'] }
+        grade: { type: string, enum: [HIGH, MID, LOW, UNAVAILABLE] }
+        sampleCount: { type: integer, format: int64 }
+
+    AnnouncementMargin:
+      type: object
+      properties:
+        announcementId: { type: integer, format: int64 }
+        priceCap: { type: boolean }
+        unranked: { type: boolean }
+        representativeGrade: { type: string, enum: [HIGH, MID, LOW, UNAVAILABLE] }
+        basisRegion: { type: string }
+        basisMonths: { type: integer }
+        units: { type: array, items: { $ref: '#/components/schemas/UnitMargin' } }
 
     AnnouncementSummary:
       type: object
@@ -268,6 +294,7 @@ components:
             summary: { type: object, additionalProperties: true }
             collectedAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
+            margin: { oneOf: [ { $ref: '#/components/schemas/AnnouncementMargin' }, { type: 'null' } ] }
 
     NotificationLogItem:
       type: object

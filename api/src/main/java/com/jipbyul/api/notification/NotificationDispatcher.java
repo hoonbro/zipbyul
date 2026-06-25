@@ -76,13 +76,13 @@ public class NotificationDispatcher {
             Outcome outcome = decide(event, user, regionMatch, finalScore);
             if (outcome == Outcome.IMMEDIATE) {
                 if (inDnd(now.toLocalTime(), user.dndStart(), user.dndEnd())) {
-                    enqueue(event, user, today, finalScore, "PUSH",
+                    enqueue(event, ctx, user, today, finalScore, "PUSH",
                             nextAllowedAt(now, user.dndStart(), user.dndEnd()));
                 } else {
                     deliver(event, ctx, user, today, finalScore);
                 }
             } else if (outcome == Outcome.DIGEST && user.dailyDigestEnabled()) {
-                enqueue(event, user, today, finalScore, "DIGEST",
+                enqueue(event, ctx, user, today, finalScore, "DIGEST",
                         nextDigestAt(now, user.dailyDigestTime(), user.dndStart(), user.dndEnd()));
             }
         }
@@ -151,8 +151,8 @@ public class NotificationDispatcher {
 
         Long logId = jdbcClient.sql("""
                 INSERT INTO notification_logs
-                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, sent_at)
-                VALUES (:uid, :eid, :channel, 'SENT', :dedup, :score, now())
+                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, sent_at, title, body)
+                VALUES (:uid, :eid, :channel, 'SENT', :dedup, :score, now(), :title, :body)
                 ON CONFLICT (anonymous_id, dedup_key) DO NOTHING
                 RETURNING id
                 """)
@@ -161,6 +161,8 @@ public class NotificationDispatcher {
                 .param("channel", channel)
                 .param("dedup", dedupKey)
                 .param("score", finalScore)
+                .param("title", ctx.title())
+                .param("body", ctx.body())
                 .query(Long.class)
                 .optional()
                 .orElse(null);
@@ -181,12 +183,12 @@ public class NotificationDispatcher {
         }
     }
 
-    private void enqueue(OutboxEvent event, Candidate user, LocalDate today, int finalScore,
-                         String channel, OffsetDateTime availableAt) {
+    private void enqueue(OutboxEvent event, EventContext ctx, Candidate user, LocalDate today,
+                         int finalScore, String channel, OffsetDateTime availableAt) {
         jdbcClient.sql("""
                 INSERT INTO notification_logs
-                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, available_at)
-                VALUES (:uid, :eid, :channel, 'PENDING', :dedup, :score, :availableAt)
+                    (anonymous_id, domain_event_id, channel, status, dedup_key, final_score, available_at, title, body)
+                VALUES (:uid, :eid, :channel, 'PENDING', :dedup, :score, :availableAt, :title, :body)
                 ON CONFLICT (anonymous_id, dedup_key) DO NOTHING
                 """)
                 .param("uid", user.anonymousId())
@@ -195,6 +197,8 @@ public class NotificationDispatcher {
                 .param("dedup", dedupKey(user.anonymousId(), event, today))
                 .param("score", finalScore)
                 .param("availableAt", availableAt)
+                .param("title", ctx.title())
+                .param("body", ctx.body())
                 .update();
     }
 

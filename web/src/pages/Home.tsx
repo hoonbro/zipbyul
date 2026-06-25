@@ -1,9 +1,20 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import DDayBadge from '../components/DDayBadge'
+import NotificationCenter from '../components/NotificationCenter'
 import StarRating from '../components/StarRating'
-import Tag from '../components/Tag'
-import { EVENT_TYPE_LABELS } from '../lib/constants'
-import { useFeedHome } from '../lib/hooks'
+import { eventTag } from '../lib/colors'
+import { useFeedHome, useNotifications } from '../lib/hooks'
+
+const NOTIF_SEEN_KEY = 'jb_notif_last_seen'
+
+function readLastSeen(): number {
+  try {
+    return Number(localStorage.getItem(NOTIF_SEEN_KEY) ?? 0)
+  } catch {
+    return 0
+  }
+}
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -16,6 +27,26 @@ function formatBaseDate(s: string): string {
 
 export default function Home() {
   const { data, isLoading, isError, error } = useFeedHome()
+  const { data: notifs } = useNotifications()
+  const [centerOpen, setCenterOpen] = useState(false)
+  const [lastSeen, setLastSeen] = useState(readLastSeen)
+  const [panelSeen, setPanelSeen] = useState(0)
+
+  const maxNotifId = (notifs ?? []).reduce((m, n) => Math.max(m, n.id), 0)
+  const hasUnseen = maxNotifId > lastSeen
+
+  const openCenter = () => {
+    setPanelSeen(lastSeen)
+    setCenterOpen(true)
+    if (maxNotifId > lastSeen) {
+      setLastSeen(maxNotifId)
+      try {
+        localStorage.setItem(NOTIF_SEEN_KEY, String(maxNotifId))
+      } catch {
+        /* noop */
+      }
+    }
+  }
 
   if (isLoading) return <p className="text-sm text-muted-2">불러오는 중…</p>
   if (isError) return <p className="text-sm text-coral">피드를 불러오지 못했습니다. ({String(error)})</p>
@@ -39,14 +70,23 @@ export default function Home() {
           </div>
           <span className="text-[19px] font-extrabold tracking-tight">집별</span>
         </div>
-        <Link to="/settings" className="relative flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-surface-2">
+        <button
+          type="button"
+          onClick={openCenter}
+          aria-label="알림"
+          className="relative flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-surface-2"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa7ba" strokeWidth="1.8" strokeLinecap="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.7 21a2 2 0 0 1-3.4 0" />
           </svg>
-          <span className="absolute right-2 top-[7px] h-[7px] w-[7px] rounded-full border-[1.5px] border-surface-2 bg-red" />
-        </Link>
+          {hasUnseen && (
+            <span className="absolute right-2 top-[7px] h-[7px] w-[7px] rounded-full border-[1.5px] border-surface-2 bg-red" />
+          )}
+        </button>
       </div>
+
+      <NotificationCenter open={centerOpen} onClose={() => setCenterOpen(false)} lastSeenId={panelSeen} />
 
       {/* radar hero */}
       <div
@@ -117,19 +157,27 @@ export default function Home() {
           <p className="text-xs text-muted-2">표시할 마감 임박 일정이 없습니다.</p>
         ) : (
           <ul className="space-y-2.5">
-            {data.urgentEvents.map((e) => (
-              <li key={e.eventId} className="flex items-center gap-3 rounded-[15px] border border-white/[0.06] bg-surface p-3.5">
-                <DDayBadge dDay={e.dDay} />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-0.5 flex items-center gap-1.5">
-                    <Tag>{EVENT_TYPE_LABELS[e.eventType] ?? e.eventType}</Tag>
-                    <span className="text-xs text-muted-2">{e.regionName ?? '서울'}</span>
+            {data.urgentEvents.map((e) => {
+              const tag = eventTag(e.eventType, e.dDay)
+              return (
+                <li key={e.eventId} className="flex items-center gap-3 rounded-[15px] border border-white/[0.06] bg-surface p-3.5">
+                  <DDayBadge dDay={e.dDay} />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-0.5 flex items-center gap-1.5">
+                      <span
+                        className="inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold"
+                        style={{ color: tag.color, background: `${tag.color}22` }}
+                      >
+                        {tag.label}
+                      </span>
+                      <span className="text-xs text-muted-2">{e.regionName ?? '서울'}</span>
+                    </div>
+                    <div className="truncate text-[15px] font-semibold">{e.title}</div>
                   </div>
-                  <div className="truncate text-[15px] font-semibold">{e.title}</div>
-                </div>
-                <StarRating stars={e.stars} />
-              </li>
-            ))}
+                  <StarRating stars={e.stars} />
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

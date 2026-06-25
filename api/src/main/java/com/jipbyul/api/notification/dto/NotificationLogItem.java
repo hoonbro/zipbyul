@@ -8,4 +8,6 @@ public record NotificationLogItem(
         String channel,
         String status,
         Integer finalScore,
-        OffsetDateTime sentAt) {}
+        OffsetDateTime sentAt,
+        String title,
+        String body) {}

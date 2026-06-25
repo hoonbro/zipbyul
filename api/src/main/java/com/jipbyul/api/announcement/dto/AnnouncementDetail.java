@@ -1,5 +1,6 @@
 package com.jipbyul.api.announcement.dto;
 
+import com.jipbyul.api.margin.dto.AnnouncementMargin;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -19,4 +20,5 @@ public record AnnouncementDetail(
         String sourceUrl,
         Map<String, Object> summary,
         OffsetDateTime collectedAt,
-        OffsetDateTime updatedAt) {}
+        OffsetDateTime updatedAt,
+        AnnouncementMargin margin) {}

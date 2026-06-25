@@ -31,6 +31,10 @@ export default function Onboarding() {
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value])
 
+  const AVAILABLE_INTERESTS = INTEREST_TYPES.filter((t) => t.available).map((t) => t.code)
+  const allRegionsSelected = regions.length === SEOUL_GU.length
+  const allInterestsSelected = AVAILABLE_INTERESTS.every((c) => interests.includes(c))
+
   // 스텝별 진행 가능 여부: 지역 ≥1, 유형 ≥1 필수 (상황·알림은 자유)
   const canAdvance =
     (step === 0 && regions.length > 0) ||
@@ -55,7 +59,7 @@ export default function Onboarding() {
   return (
     <div className="mx-auto flex h-full max-w-[430px] flex-col bg-bg">
       {/* header */}
-      <div className="flex-none px-[22px] pb-3.5 pt-2">
+      <div className="flex-none px-[22px] pb-3.5 pt-[calc(env(safe-area-inset-top)_+_8px)]">
         <div className="mb-4 flex items-center gap-2.5">
           {step > 0 && (
             <button
@@ -80,13 +84,25 @@ export default function Onboarding() {
         <p className="mb-6 text-sm leading-relaxed text-muted">{meta.sub}</p>
 
         {step === 0 && (
-          <div className="flex flex-wrap gap-2.5">
-            {SEOUL_GU.map((gu) => (
-              <Chip key={gu} selected={regions.includes(gu)} onClick={() => toggle(regions, setRegions, gu)}>
-                {gu}
-              </Chip>
-            ))}
-          </div>
+          <>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[13px] text-muted">{regions.length}개 선택됨</span>
+              <button
+                type="button"
+                onClick={() => setRegions(allRegionsSelected ? [] : [...SEOUL_GU])}
+                className="text-[13px] font-semibold text-mint"
+              >
+                {allRegionsSelected ? '전체 해제' : '전체 선택'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {SEOUL_GU.map((gu) => (
+                <Chip key={gu} selected={regions.includes(gu)} onClick={() => toggle(regions, setRegions, gu)}>
+                  {gu}
+                </Chip>
+              ))}
+            </div>
+          </>
         )}
 
         {step === 1 && (
@@ -110,14 +126,26 @@ export default function Onboarding() {
         )}
 
         {step === 2 && (
-          <div className="flex flex-wrap gap-2.5">
-            {INTEREST_TYPES.map((t) => (
-              <Chip key={t.code} selected={interests.includes(t.code)} disabled={!t.available} onClick={() => toggle(interests, setInterests, t.code)}>
-                {t.label}
-                {!t.available && ' (준비중)'}
-              </Chip>
-            ))}
-          </div>
+          <>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[13px] text-muted">{interests.length}개 선택됨</span>
+              <button
+                type="button"
+                onClick={() => setInterests(allInterestsSelected ? [] : AVAILABLE_INTERESTS)}
+                className="text-[13px] font-semibold text-mint"
+              >
+                {allInterestsSelected ? '전체 해제' : '전체 선택'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {INTEREST_TYPES.map((t) => (
+                <Chip key={t.code} selected={interests.includes(t.code)} disabled={!t.available} onClick={() => toggle(interests, setInterests, t.code)}>
+                  {t.label}
+                  {!t.available && ' (준비중)'}
+                </Chip>
+              ))}
+            </div>
+          </>
         )}
 
         {step === 3 && (
@@ -150,7 +178,7 @@ export default function Onboarding() {
       </div>
 
       {/* footer */}
-      <div className="flex-none px-[22px] pb-7 pt-3.5">
+      <div className="flex-none px-[22px] pb-[calc(env(safe-area-inset-bottom)_+_14px)] pt-3.5">
         <button
           type="button"
           onClick={next}

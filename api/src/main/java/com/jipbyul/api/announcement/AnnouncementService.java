@@ -7,6 +7,8 @@ import com.jipbyul.api.announcement.dto.AnnouncementListResponse;
 import com.jipbyul.api.announcement.dto.AnnouncementSummary;
 import com.jipbyul.api.common.ApiException;
 import com.jipbyul.api.common.ErrorCode;
+import com.jipbyul.api.margin.SafetyMarginService;
+import com.jipbyul.api.margin.dto.AnnouncementMargin;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -20,10 +22,13 @@ public class AnnouncementService {
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;
+    private final SafetyMarginService marginService;
 
-    public AnnouncementService(JdbcClient jdbcClient, ObjectMapper objectMapper) {
+    public AnnouncementService(JdbcClient jdbcClient, ObjectMapper objectMapper,
+            SafetyMarginService marginService) {
         this.jdbcClient = jdbcClient;
         this.objectMapper = objectMapper;
+        this.marginService = marginService;
     }
 
     public AnnouncementListResponse list(String region, String supplyType, int page, int size) {
@@ -68,6 +73,7 @@ public class AnnouncementService {
     }
 
     public AnnouncementDetail detail(long id) {
+        AnnouncementMargin margin = marginService.compute(List.of(id)).get(id);
         return jdbcClient.sql("""
                 SELECT ha.id, ha.pblanc_no, ha.title, ha.supply_type, ha.gu_name, ha.bjd_code,
                        ha.apply_start, ha.apply_end, ha.winner_announce_date, ha.contract_date,
@@ -93,7 +99,8 @@ public class AnnouncementService {
                         rs.getString("source_url"),
                         parseJson(rs.getString("summary_json")),
                         rs.getObject("collected_at", OffsetDateTime.class),
-                        rs.getObject("updated_at", OffsetDateTime.class)))
+                        rs.getObject("updated_at", OffsetDateTime.class),
+                        margin))
                 .optional()
                 .orElseThrow(() -> new ApiException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
     }

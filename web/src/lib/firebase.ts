@@ -62,7 +62,7 @@ export async function registerPush(): Promise<PushResult> {
     if (permission !== 'granted') {
       return { ok: false, reason: 'denied' }
     }
-    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    const swReg = await navigator.serviceWorker.register('/firebase-push/firebase-messaging-sw.js')
     const token = await getToken(m, {
       vapidKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
       serviceWorkerRegistration: swReg,

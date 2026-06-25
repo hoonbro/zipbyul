@@ -4,9 +4,12 @@ import com.jipbyul.api.calendar.dto.CalendarItemDto;
 import com.jipbyul.api.common.ApiException;
 import com.jipbyul.api.common.ErrorCode;
 import com.jipbyul.api.common.Times;
+import com.jipbyul.api.margin.SafetyMarginService;
+import com.jipbyul.api.margin.dto.AnnouncementMargin;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.core.simple.JdbcClient.StatementSpec;
 import org.springframework.stereotype.Service;
@@ -15,9 +18,11 @@ import org.springframework.stereotype.Service;
 public class CalendarService {
 
     private final JdbcClient jdbcClient;
+    private final SafetyMarginService marginService;
 
-    public CalendarService(JdbcClient jdbcClient) {
+    public CalendarService(JdbcClient jdbcClient, SafetyMarginService marginService) {
         this.jdbcClient = jdbcClient;
+        this.marginService = marginService;
     }
 
     public List<CalendarItemDto> find(LocalDate from, LocalDate to, String eventType, String region) {
@@ -59,7 +64,7 @@ public class CalendarService {
         }
 
         LocalDate today = Times.today();
-        return spec.query((rs, n) -> {
+        List<CalendarItemDto> items = spec.query((rs, n) -> {
             LocalDate eventDate = rs.getObject("event_date", LocalDate.class);
             return new CalendarItemDto(
                     rs.getLong("id"),
@@ -72,8 +77,24 @@ public class CalendarService {
                     rs.getString("title"),
                     rs.getString("supply_type"),
                     rs.getString("source_name"),
-                    rs.getString("source_url"));
+                    rs.getString("source_url"),
+                    null, null, null);
         }).list();
+
+        List<Long> announcementIds = items.stream()
+                .filter(it -> "ANNOUNCEMENT".equals(it.refType()))
+                .map(CalendarItemDto::refId)
+                .distinct()
+                .toList();
+        Map<Long, AnnouncementMargin> margins = marginService.compute(announcementIds);
+
+        return items.stream().map(it -> {
+            AnnouncementMargin m = margins.get(it.refId());
+            if (m == null || !"ANNOUNCEMENT".equals(it.refType())) {
+                return it;
+            }
+            return it.withMargin(m.representativeGrade(), m.priceCap(), m.unranked());
+        }).toList();
     }
 
     private void requireRegion(String guName) {

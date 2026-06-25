@@ -1,7 +1,12 @@
 """순수 매핑/파싱 헬퍼 테스트 (외부 의존 없음)."""
 from datetime import date
 
-from jipbyul_collector.adapters.applyhome import _gu_from_addr, _map_supply
+from jipbyul_collector.adapters.applyhome import (
+    _gu_from_addr,
+    _map_mdl_unit,
+    _map_supply,
+    _price_cap,
+)
 from jipbyul_collector.adapters.lh import _map_supply as lh_map_supply
 from jipbyul_collector.normalize.announcement import _make_hash, _parse_date
 
@@ -38,6 +43,37 @@ def test_parse_date_formats():
     assert _parse_date("2026.05.07") == date(2026, 5, 7)
     assert _parse_date(None) is None
     assert _parse_date("not-a-date") is None
+
+
+def test_map_mdl_unit_extracts_fields_manwon():
+    row = {
+        "PBLANC_NO": "2025000585",
+        "HOUSE_TY": "059.9500A",
+        "SUPLY_AR": "59.95",
+        "SUPLY_HSHLDCO": "120",
+        "LTTOT_TOP_AMOUNT": "65000",  # 분양최고금액, 만원 단위 그대로
+    }
+    assert _map_mdl_unit(row) == {
+        "house_type": "059.9500A",
+        "area_m2": 59.95,
+        "supply_count": 120,
+        "supply_amount_manwon": 65000,
+    }
+
+
+def test_map_mdl_unit_handles_missing_and_commas():
+    out = _map_mdl_unit({"HOUSE_TY": "084A", "LTTOT_TOP_AMOUNT": "1,250,000"})
+    assert out["house_type"] == "084A"
+    assert out["supply_amount_manwon"] == 1250000
+    assert out["area_m2"] is None
+    assert out["supply_count"] is None
+
+
+def test_price_cap_accepts_english_and_korean_keys():
+    assert _price_cap({"PARCPRC_ULS_AT": "Y"}) is True
+    assert _price_cap({"PARCPRC_ULS_AT": "N"}) is False
+    assert _price_cap({"분양가상한제": "Y"}) is True
+    assert _price_cap({}) is None
 
 
 def test_make_hash_is_deterministic_64hex():

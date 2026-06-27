@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Chip from '../components/Chip'
 import { SEOUL_GU } from '../lib/constants'
-import { usePreferences, useSavePreferences, useWatchSummary } from '../lib/hooks'
+import { usePreferences, useRegions, useSavePreferences, useWatchSummary } from '../lib/hooks'
 import type { Preferences } from '../lib/types'
 
 export default function WatchRegions() {
@@ -57,22 +57,43 @@ function Stat({ v, k, color }: { v: number; k: string; color: string }) {
 
 function RegionEditor({ prefs }: { prefs: Preferences }) {
   const save = useSavePreferences()
-  const [selected, setSelected] = useState<string[]>(() => prefs.watchRegions.map((r) => r.guName))
+  const [selected, setSelected] = useState<string[]>(() =>
+    [...new Set(prefs.watchRegions.map((r) => r.guName))],
+  )
+  const [dongsByGu, setDongsByGu] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {}
+    for (const r of prefs.watchRegions) {
+      if (r.bjdCode) (init[r.guName] ??= []).push(r.bjdCode)
+    }
+    return init
+  })
 
   const toggle = (gu: string) =>
     setSelected((s) => (s.includes(gu) ? s.filter((v) => v !== gu) : [...s, gu]))
 
-  const submit = () =>
+  const toggleDong = (gu: string, bjdCode: string) =>
+    setDongsByGu((m) => {
+      const cur = m[gu] ?? []
+      const next = cur.includes(bjdCode) ? cur.filter((v) => v !== bjdCode) : [...cur, bjdCode]
+      return { ...m, [gu]: next }
+    })
+
+  const submit = () => {
+    const watchRegions = selected.flatMap((guName) => [
+      { guName, bjdCode: null },
+      ...(dongsByGu[guName] ?? []).map((bjdCode) => ({ guName, bjdCode })),
+    ])
     save.mutate({
       alertLevel: prefs.alertLevel,
       interestTypes: prefs.interestTypes,
-      watchRegions: selected.map((guName) => ({ guName })),
+      watchRegions,
       txAlertOptin: prefs.txAlertOptin,
       dailyDigestEnabled: prefs.dailyDigestEnabled,
       dailyDigestTime: prefs.dailyDigestTime,
       dndStart: prefs.dndStart,
       dndEnd: prefs.dndEnd,
     })
+  }
 
   return (
     <section>
@@ -84,6 +105,21 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
           </Chip>
         ))}
       </div>
+
+      {selected.length > 0 && (
+        <div className="mt-5 space-y-4">
+          <p className="text-xs text-muted-2">동 단위로 실거래를 좁히려면 선택하세요 (선택 안 하면 자치구 전체).</p>
+          {selected.map((gu) => (
+            <DongNarrowing
+              key={gu}
+              gu={gu}
+              selected={dongsByGu[gu] ?? []}
+              onToggle={(bjd) => toggleDong(gu, bjd)}
+            />
+          ))}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={submit}
@@ -95,5 +131,33 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
       {save.isSuccess && <p className="mt-2 text-center text-xs text-mint">저장됐습니다.</p>}
       {save.isError && <p className="mt-2 text-center text-xs text-coral">저장 실패</p>}
     </section>
+  )
+}
+
+function DongNarrowing({
+  gu,
+  selected,
+  onToggle,
+}: {
+  gu: string
+  selected: string[]
+  onToggle: (bjdCode: string) => void
+}) {
+  const regions = useRegions(gu)
+
+  return (
+    <div className="rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
+      <div className="mb-2.5 text-sm font-bold">{gu}</div>
+      {regions.isLoading && <p className="text-xs text-muted-2">동 목록 불러오는 중…</p>}
+      {regions.data && (
+        <div className="flex flex-wrap gap-2">
+          {regions.data.map((r) => (
+            <Chip key={r.bjdCode} selected={selected.includes(r.bjdCode)} onClick={() => onToggle(r.bjdCode)}>
+              {r.dongName}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

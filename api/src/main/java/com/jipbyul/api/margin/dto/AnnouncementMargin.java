@@ -8,6 +8,7 @@ public record AnnouncementMargin(
         boolean priceCap,
         boolean unranked,
         String representativeGrade, // 59 규칙으로 뽑은 대표 주택형의 등급
-        String basisRegion, // 자치구 (MVP 매칭 단위)
+        String basisRegion, // 자치구 (gu_name)
         int basisMonths,
+        String basisLevel, // 비교 기준: COMPLEX(같은 단지)/PRESALE(동 분양권)/PRESALE_GU(구 분양권)/DONG(같은 동)/GU(자치구)/null
         List<UnitMargin> units) {}

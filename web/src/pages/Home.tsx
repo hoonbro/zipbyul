@@ -4,6 +4,7 @@ import DDayBadge from '../components/DDayBadge'
 import NotificationCenter from '../components/NotificationCenter'
 import StarRating from '../components/StarRating'
 import { eventTag } from '../lib/colors'
+import { TRADE_TYPE_LABELS } from '../lib/constants'
 import { useFeedHome, useNotifications } from '../lib/hooks'
 
 const NOTIF_SEEN_KEY = 'jb_notif_last_seen'
@@ -229,20 +230,25 @@ export default function Home() {
 
       {/* 실거래 신규 등록 */}
       <section>
-        <div className="mb-3 flex items-center gap-2">
-          <h2 className="text-base font-extrabold tracking-tight">실거래 신규 등록</h2>
-          <span className="rounded-md bg-mint/15 px-1.5 py-px font-mono text-[10px] text-mint">NEW</span>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-extrabold tracking-tight">실거래 신규 등록</h2>
+            <span className="rounded-md bg-mint/15 px-1.5 py-px text-[10px] text-mint">신규</span>
+          </div>
+          <Link to="/transactions" className="text-xs text-muted-2">
+            전체 보기 ›
+          </Link>
         </div>
         {data.recentTransactions.length === 0 ? (
           <p className="text-xs text-muted-2">최근 등록된 실거래가 없습니다.</p>
         ) : (
           <ul className="space-y-2.5">
             {data.recentTransactions.map((t) => {
-              const c = t.tradeType === '매매' ? '#3df5c5' : '#5ba8ff'
+              const c = t.tradeType === 'SALE' ? '#3df5c5' : '#5ba8ff'
               return (
                 <li key={t.transactionId} className="flex items-center gap-3 rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3">
-                  <span className="shrink-0 rounded-lg px-2.5 py-1.5 font-mono text-[11px] font-bold" style={{ color: c, background: `${c}22` }}>
-                    {t.tradeType}
+                  <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold" style={{ color: c, background: `${c}22` }}>
+                    {TRADE_TYPE_LABELS[t.tradeType] ?? t.tradeType}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-bold">{t.complexName ?? '(단지 미상)'}</div>

@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 public record UnitMargin(
         String houseType,
         BigDecimal areaM2,
+        Integer supplyCount,
         Long supplyAmountManwon,
         Long marketMedianManwon,
         Long marginManwon,

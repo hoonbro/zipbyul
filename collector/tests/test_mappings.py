@@ -46,10 +46,11 @@ def test_parse_date_formats():
 
 
 def test_map_mdl_unit_extracts_fields_manwon():
+    # area_m2는 SUPLY_AR(공급면적)이 아니라 HOUSE_TY에서 전용면적을 파싱한다.
     row = {
         "PBLANC_NO": "2025000585",
         "HOUSE_TY": "059.9500A",
-        "SUPLY_AR": "59.95",
+        "SUPLY_AR": "89.94",  # 공급면적 — 무시됨
         "SUPLY_HSHLDCO": "120",
         "LTTOT_TOP_AMOUNT": "65000",  # 분양최고금액, 만원 단위 그대로
     }
@@ -62,11 +63,13 @@ def test_map_mdl_unit_extracts_fields_manwon():
 
 
 def test_map_mdl_unit_handles_missing_and_commas():
-    out = _map_mdl_unit({"HOUSE_TY": "084A", "LTTOT_TOP_AMOUNT": "1,250,000"})
-    assert out["house_type"] == "084A"
+    out = _map_mdl_unit({"HOUSE_TY": "084.9941B", "LTTOT_TOP_AMOUNT": "1,250,000"})
+    assert out["house_type"] == "084.9941B"
     assert out["supply_amount_manwon"] == 1250000
-    assert out["area_m2"] is None
+    assert out["area_m2"] == 84.9941
     assert out["supply_count"] is None
+    # 주택형 없으면 전용 파싱 불가 → None
+    assert _map_mdl_unit({})["area_m2"] is None
 
 
 def test_price_cap_accepts_english_and_korean_keys():

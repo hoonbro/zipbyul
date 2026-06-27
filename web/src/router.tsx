@@ -11,6 +11,7 @@ import Calendar from './pages/Calendar'
 import Announcements from './pages/Announcements'
 import AnnouncementDetail from './pages/AnnouncementDetail'
 import WatchRegions from './pages/WatchRegions'
+import Transactions from './pages/Transactions'
 import NotificationSettings from './pages/NotificationSettings'
 
 // recharts가 무거워 집값전망만 코드스플릿
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: 'announcements', element: <Announcements /> },
           { path: 'announcements/:id', element: <AnnouncementDetail /> },
           { path: 'watch', element: <WatchRegions /> },
+          { path: 'transactions', element: <Transactions /> },
           { path: 'settings', element: <NotificationSettings /> },
         ],
       },

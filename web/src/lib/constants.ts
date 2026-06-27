@@ -53,6 +53,13 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   MARKET_INDEX_UPDATED: '집값전망 갱신',
 }
 
+export const TRADE_TYPE_LABELS: Record<string, string> = {
+  SALE: '매매',
+  JEONSE: '전세',
+  MONTHLY: '월세',
+  PRESALE: '분양권',
+}
+
 export const SUPPLY_TYPE_LABELS: Record<string, string> = {
   PRIVATE_SALE: '민간분양',
   UNRANKED: '무순위·잔여',

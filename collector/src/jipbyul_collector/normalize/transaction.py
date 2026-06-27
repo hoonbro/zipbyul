@@ -43,6 +43,7 @@ def upsert_transaction(
     contract_day: int,
     rgst_date_str: str | None,
     emitter,
+    build_year: int | None = None,  # 연식(안전마진 신축 보정, V10)
 ) -> bool:
     """
     Returns True if INSERT (신규 등록 → TRANSACTION_NEW 발행).
@@ -67,23 +68,23 @@ def upsert_transaction(
         INSERT INTO real_estate_transactions
             (source_code, bjd_code, gu_name, dong_name, complex_name,
              trade_type, area_m2, floor, price_manwon,
-             contract_date, contract_month, registered_at, dedup_hash)
+             contract_date, contract_month, registered_at, build_year, dedup_hash)
         VALUES
             (%s, %s, %s, %s, %s,
              %s, %s, %s, %s,
-             %s, %s, %s, %s)
-        ON CONFLICT (dedup_hash) DO NOTHING
+             %s, %s, %s, %s, %s)
+        ON CONFLICT (dedup_hash) DO UPDATE
+            SET build_year = EXCLUDED.build_year
         RETURNING id, (xmax = 0) AS is_insert
         """,
         (
             source_code, bjd_code, gu_name, dong_name, complex_name,
             trade_type, area_m2, floor, price_manwon,
-            contract_date, contract_month_str, registered_at, dedup_hash,
+            contract_date, contract_month_str, registered_at, build_year, dedup_hash,
         ),
     ).fetchone()
 
     if row is None:
-        # ON CONFLICT DO NOTHING → 이미 존재
         return False
 
     tx_id     = row["id"]

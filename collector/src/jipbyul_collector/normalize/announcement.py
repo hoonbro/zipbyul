@@ -51,6 +51,8 @@ def upsert_announcement(
     summary_json: dict,
     emitter,  # BaseAdapter.emit_event
     price_cap_yn: bool | None = None,  # 분양가상한제 (로또 단서). 안전마진 §2-1
+    dong_name: str | None = None,      # 주소 파싱 법정동 (동 단위 매칭, V10)
+    complex_norm: str | None = None,   # 정규화 단지명 (무순위 같은-단지 매칭, V10)
 ) -> bool:
     """
     Returns True if this was a new INSERT (→ ANNOUNCEMENT_NEW 이벤트 발행).
@@ -71,17 +73,21 @@ def upsert_announcement(
                 (source_code, source_ref_id, pblanc_no, title, supply_type,
                  gu_name, bjd_code, apply_start, apply_end,
                  winner_announce_date, contract_date,
-                 source_url, summary_json, price_cap_yn, dedup_hash)
+                 source_url, summary_json, price_cap_yn,
+                 dong_name, complex_norm, dedup_hash)
             VALUES
                 (%s, %s, %s, %s, %s,
                  %s, %s, %s, %s,
                  %s, %s,
-                 %s, %s, %s, %s)
+                 %s, %s, %s,
+                 %s, %s, %s)
             ON CONFLICT (dedup_hash) DO UPDATE
                 SET title        = EXCLUDED.title,
                     apply_start  = EXCLUDED.apply_start,
                     apply_end    = EXCLUDED.apply_end,
                     price_cap_yn = EXCLUDED.price_cap_yn,
+                    dong_name    = EXCLUDED.dong_name,
+                    complex_norm = EXCLUDED.complex_norm,
                     updated_at   = now()
             RETURNING id, (xmax = 0) AS is_insert
             """,
@@ -89,7 +95,8 @@ def upsert_announcement(
                 source_code, source_ref_id, pblanc_no, title, supply_type,
                 gu_name, bjd_code, apply_start_d, apply_end_d,
                 winner_d, contract_d,
-                source_url, Jsonb(summary_json), price_cap_yn, dedup_hash,
+                source_url, Jsonb(summary_json), price_cap_yn,
+                dong_name, complex_norm, dedup_hash,
             ),
         ).fetchone()
 

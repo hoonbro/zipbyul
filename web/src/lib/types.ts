@@ -50,6 +50,12 @@ export interface NotificationLogItem {
   body: string | null
 }
 
+export interface RegionItem {
+  bjdCode: string
+  guName: string
+  dongName: string
+}
+
 export interface RecentTransaction {
   transactionId: number
   regionName: string
@@ -110,6 +116,7 @@ export interface CalendarItem {
 export interface UnitMargin {
   houseType: string | null
   areaM2: number | null
+  supplyCount: number | null
   supplyAmountManwon: number | null
   marketMedianManwon: number | null
   marginManwon: number | null
@@ -125,6 +132,7 @@ export interface AnnouncementMargin {
   representativeGrade: string
   basisRegion: string
   basisMonths: number
+  basisLevel: string | null
   units: UnitMargin[]
 }
 

@@ -68,6 +68,7 @@ class MolitAdapter(BaseAdapter):
         for (src, svc_name, operation, base_trade_type), (lawd_cd, gu_name) in product(
             [
                 ("MOLIT_APT_TRADE",   "RTMSDataSvcAptTradeDev", "getRTMSDataSvcAptTradeDev", "SALE"),
+                ("MOLIT_APT_PRESALE", "RTMSDataSvcSilvTrade",   "getRTMSDataSvcSilvTrade",   "PRESALE"),
                 ("MOLIT_APT_RENT",    "RTMSDataSvcAptRent",     "getRTMSDataSvcAptRent",     "JEONSE"),
                 ("MOLIT_VILLA_TRADE", "RTMSDataSvcRHTrade",     "getRTMSDataSvcRHTrade",     "SALE"),
                 ("MOLIT_VILLA_RENT",  "RTMSDataSvcSHRent",      "getRTMSDataSvcSHRent",      "JEONSE"),
@@ -138,6 +139,8 @@ class MolitAdapter(BaseAdapter):
                     month        = int(item.get("dealMonth") or item.get("월") or 0)
                     day          = int(item.get("dealDay") or item.get("일") or 1)
                     rgst_date    = item.get("rgstDate") or item.get("등록일")
+                    build_raw    = item.get("buildYear") or item.get("건축년도")
+                    build_year   = int(build_raw) if build_raw and str(build_raw).strip().isdigit() else None
 
                     # 전월세는 거래금액 대신 보증금/월세 합산
                     if trade_type == "JEONSE" and price is None:
@@ -168,6 +171,7 @@ class MolitAdapter(BaseAdapter):
                             contract_day  = day,
                             rgst_date_str = rgst_date,
                             emitter       = self.emit_event,
+                            build_year    = build_year,
                         )
                     if is_new:
                         new_count += 1

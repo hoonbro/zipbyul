@@ -5,6 +5,7 @@
 갱신되지 않아, 실제 청약홈 DB와 연동된 실시간 REST 엔드포인트로 전환.
 """
 import logging
+import re
 
 import httpx
 
@@ -45,11 +46,11 @@ _UNRANKED_MDL_URL = f"{_BASE}/getRemndrLttotPblancMdl"
 # 첫 라이브 실행 때 키만 sanity-check(틀려도 NULL→'산출 불가'로 비활성).
 _MDL_FIELDS = {
     "pblanc_no":            "PBLANC_NO",
-    "house_type":           "HOUSE_TY",         # 주택형 (예: 059.9500A)
-    "area_m2":              "SUPLY_AR",          # 전용면적
+    "house_type":           "HOUSE_TY",         # 주택형 (예: 059.9500A) — 전용면적 내장
     "supply_count":         "SUPLY_HSHLDCO",     # 공급세대수
     "supply_amount_manwon": "LTTOT_TOP_AMOUNT",  # 분양최고금액(만원)
 }
+# 주의: SUPLY_AR은 전용이 아니라 '공급면적'이라 매칭에 부적합 → area_m2는 HOUSE_TY에서 전용 파싱.
 
 
 def _is_seoul(item: dict) -> bool:
@@ -107,6 +108,8 @@ class ApplyhomeAptAdapter(BaseAdapter):
                                             or item.get("HOUSE_SECD_NM")),
                 gu_name       = _gu_from_addr(item.get("HSSPLY_ADRES", "")),
                 bjd_code      = None,
+                dong_name     = _dong_from_addr(item.get("HSSPLY_ADRES")),
+                complex_norm  = _complex_norm(item.get("HOUSE_NM")),
                 apply_start   = item.get("RCEPT_BGNDE"),
                 apply_end     = item.get("RCEPT_ENDDE"),
                 winner_date   = item.get("PRZWNER_PRESNATN_DE"),
@@ -150,6 +153,8 @@ class ApplyhomeUnrankedAdapter(BaseAdapter):
                 supply_type   = _map_supply(item.get("HOUSE_SECD_NM")),
                 gu_name       = _gu_from_addr(item.get("HSSPLY_ADRES", "")),
                 bjd_code      = None,
+                dong_name     = _dong_from_addr(item.get("HSSPLY_ADRES")),
+                complex_norm  = _complex_norm(item.get("HOUSE_NM")),
                 apply_start   = item.get("SUBSCRPT_RCEPT_BGNDE") or item.get("GNRL_RCEPT_BGNDE"),
                 apply_end     = item.get("SUBSCRPT_RCEPT_ENDDE") or item.get("GNRL_RCEPT_ENDDE"),
                 winner_date   = item.get("PRZWNER_PRESNATN_DE"),
@@ -186,6 +191,22 @@ def _gu_from_addr(addr: str) -> str | None:
     return None
 
 
+def _dong_from_addr(addr: str | None) -> str | None:
+    """주소에서 법정동명 파싱 (실거래 dong_name과 동일 텍스트로 매칭). 첫 'OO동'."""
+    if not addr:
+        return None
+    m = re.search(r"([가-힣]+동)", addr)
+    return m.group(1) if m else None
+
+
+def _complex_norm(name: str | None) -> str | None:
+    """단지명 정규화 — 공백·괄호·숫자·'차' 제거. V10 함수형 인덱스 규칙과 동일."""
+    if not name:
+        return None
+    norm = re.sub(r"[\s()0-9차]", "", name)
+    return norm or None
+
+
 def _price_cap(item: dict) -> bool | None:
     """헤더 분양가상한제 적용여부 → bool. 영문 PARCPRC_ULS_AT / 한글 '분양가상한제' 둘 다 허용."""
     for key in ("PARCPRC_ULS_AT", "분양가상한제"):
@@ -209,12 +230,20 @@ def _to_int(v) -> int | None:
     return int(n) if n is not None else None
 
 
+def _area_from_house_type(house_type: str | None) -> float | None:
+    """주택형 코드(예: 059.9500A)에서 전용면적 파싱. SUPLY_AR은 공급면적이라 매칭에 부적합."""
+    if not house_type:
+        return None
+    m = re.match(r"\d+\.?\d*", house_type.strip())
+    return float(m.group()) if m else None
+
+
 def _map_mdl_unit(row: dict) -> dict:
     """청약홈 Mdl 한 행 → announcement_unit 내부 dict. 키는 _MDL_FIELDS로 격리."""
     f = _MDL_FIELDS
     return {
         "house_type":           row.get(f["house_type"]),
-        "area_m2":              _to_num(row.get(f["area_m2"])),
+        "area_m2":              _area_from_house_type(row.get(f["house_type"])),
         "supply_count":         _to_int(row.get(f["supply_count"])),
         "supply_amount_manwon": _to_int(row.get(f["supply_amount_manwon"])),
     }

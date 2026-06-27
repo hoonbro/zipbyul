@@ -8,6 +8,8 @@ import type {
   HousePriceOutlook,
   NotificationLogItem,
   Preferences,
+  RecentTransaction,
+  RegionItem,
   RegionSummaryItem,
 } from './types'
 
@@ -117,6 +119,35 @@ export function useWatchSummary() {
   return useQuery({
     queryKey: ['watch', 'summary'],
     queryFn: () => apiFetch<RegionSummaryItem[]>('/v1/watch/regions/summary', { withAnonymousId: true }),
+  })
+}
+
+export function useRegions(gu: string | null) {
+  return useQuery({
+    queryKey: ['regions', gu],
+    enabled: !!gu,
+    queryFn: () => apiFetch<RegionItem[]>(`/v1/regions?gu=${encodeURIComponent(gu!)}`),
+  })
+}
+
+export interface RecentTransactionParams {
+  region?: string
+  dong?: string
+  bjdCode?: string
+}
+
+export function useRecentTransactions(params: RecentTransactionParams) {
+  const qs = new URLSearchParams()
+  if (params.region) qs.set('region', params.region)
+  if (params.dong) qs.set('dong', params.dong)
+  if (params.bjdCode) qs.set('bjdCode', params.bjdCode)
+  const query = qs.toString()
+  return useQuery({
+    queryKey: ['transactions', 'recent', params],
+    queryFn: () =>
+      apiFetch<{ items: RecentTransaction[]; notice: string }>(
+        `/v1/transactions/recent${query ? `?${query}` : ''}`,
+      ),
   })
 }
 

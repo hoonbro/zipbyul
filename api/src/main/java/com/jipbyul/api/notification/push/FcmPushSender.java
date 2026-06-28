@@ -61,18 +61,23 @@ public class FcmPushSender implements PushSender {
     }
 
     @Override
+    public String channel() {
+        return "FCM";
+    }
+
+    @Override
     public boolean isEnabled() {
         return messaging != null;
     }
 
     @Override
-    public PushResult send(String deviceToken, String title, String body) {
+    public PushResult send(PushTarget target, String title, String body) {
         if (messaging == null) {
             return PushResult.fail("FCM_DISABLED");
         }
         try {
             Message message = Message.builder()
-                    .setToken(deviceToken)
+                    .setToken(target.token())
                     .setNotification(Notification.builder().setTitle(title).setBody(body).build())
                     .build();
             messaging.send(message);

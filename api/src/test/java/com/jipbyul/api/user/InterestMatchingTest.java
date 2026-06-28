@@ -15,8 +15,17 @@ class InterestMatchingTest {
         assertThat(InterestMatching.forSupplyType("UNRANKED")).isEqualTo(InterestType.UNRANKED_SUB);
         assertThat(InterestMatching.forSupplyType("NATIONAL_RENTAL")).isEqualTo(InterestType.HAPPY_HOUSE);
         assertThat(InterestMatching.forSupplyType("JEONSE_RENTAL")).isEqualTo(InterestType.PURCHASE_RENTAL);
+        assertThat(InterestMatching.forSupplyType("YOUTH_SAFE_HOUSE")).isEqualTo(InterestType.YOUTH_SAFE_HOUSE);
+        assertThat(InterestMatching.forSupplyType("LONG_TERM_JEONSE")).isEqualTo(InterestType.LONG_TERM_JEONSE);
         assertThat(InterestMatching.forSupplyType(null)).isNull();
         assertThat(InterestMatching.forSupplyType("UNKNOWN")).isNull();
+    }
+
+    @Test
+    void matchesManualShSupplyTypes() {
+        assertThat(InterestMatching.matches(Set.of("YOUTH_SAFE_HOUSE"), "YOUTH_SAFE_HOUSE")).isTrue();
+        assertThat(InterestMatching.matches(Set.of("LONG_TERM_JEONSE"), "LONG_TERM_JEONSE")).isTrue();
+        assertThat(InterestMatching.matches(Set.of("YOUTH_SAFE_HOUSE"), "LONG_TERM_JEONSE")).isFalse();
     }
 
     @Test

@@ -37,7 +37,7 @@ public class CalendarService {
                 SELECT ci.id, ci.ref_type, ci.ref_id, ci.event_type, ci.gu_name, ci.event_date,
                        COALESCE(ha.title, pe.title) AS title,
                        ha.supply_type,
-                       COALESCE(ha.source_url, sr.base_url) AS source_url,
+                       COALESCE(ha.source_url, pe.source_url, sr.base_url) AS source_url,
                        sr.name AS source_name
                 FROM calendar_items ci
                 LEFT JOIN housing_announcements ha

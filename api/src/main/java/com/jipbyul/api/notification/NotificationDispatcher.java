@@ -3,6 +3,7 @@ package com.jipbyul.api.notification;
 import com.jipbyul.api.common.Times;
 import com.jipbyul.api.notification.push.PushResult;
 import com.jipbyul.api.notification.push.PushSender;
+import com.jipbyul.api.notification.push.PushTarget;
 import com.jipbyul.api.user.InterestMatching;
 import com.jipbyul.api.user.InterestType;
 import java.sql.Array;
@@ -27,21 +28,22 @@ public class NotificationDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatcher.class);
 
-    private enum Outcome { IMMEDIATE, DIGEST, IGNORE }
+    enum Outcome { IMMEDIATE, DIGEST, IGNORE }
 
     private final JdbcClient jdbcClient;
     private final OutboxClaimer claimer;
-    private final PushSender pushSender;
+    private final Map<String, PushSender> pushSenders;
     private final int maxRetry;
 
     public NotificationDispatcher(
             JdbcClient jdbcClient,
             OutboxClaimer claimer,
-            PushSender pushSender,
+            List<PushSender> pushSenders,
             @Value("${notification.consumer.max-retry:5}") int maxRetry) {
         this.jdbcClient = jdbcClient;
         this.claimer = claimer;
-        this.pushSender = pushSender;
+        this.pushSenders = pushSenders.stream()
+                .collect(Collectors.toMap(PushSender::channel, s -> s));
         this.maxRetry = maxRetry;
     }
 
@@ -73,7 +75,8 @@ public class NotificationDispatcher {
             }
             int delta = (regionMatch ? 2 : 0) + (typeMatch ? 2 : 0);
             int finalScore = clamp(event.baseScore() + delta, 0, 10);
-            Outcome outcome = decide(event, user, regionMatch, finalScore);
+            Outcome outcome = decide(event.eventType(), user.alertLevel(), user.txAlertOptin(),
+                    regionMatch, finalScore);
             if (outcome == Outcome.IMMEDIATE) {
                 if (inDnd(now.toLocalTime(), user.dndStart(), user.dndEnd())) {
                     enqueue(event, ctx, user, today, finalScore, "PUSH",
@@ -128,15 +131,16 @@ public class NotificationDispatcher {
         return claimed.size();
     }
 
-    private Outcome decide(OutboxEvent event, Candidate user, boolean regionMatch, int finalScore) {
-        if ("TRANSACTION_NEW".equals(event.eventType())) {
-            return (user.txAlertOptin() && finalScore >= 4) ? Outcome.IMMEDIATE : Outcome.DIGEST;
+    static Outcome decide(String eventType, String alertLevel, boolean txAlertOptin,
+                          boolean regionMatch, int finalScore) {
+        if ("TRANSACTION_NEW".equals(eventType)) {
+            return (txAlertOptin && finalScore >= 4) ? Outcome.IMMEDIATE : Outcome.DIGEST;
         }
-        return switch (user.alertLevel()) {
+        return switch (alertLevel) {
             case "ALL" -> Outcome.IMMEDIATE;
             case "IMPORTANT_ONLY" -> finalScore >= 4 ? Outcome.IMMEDIATE : Outcome.DIGEST;
             case "DEADLINE_ONLY" ->
-                    "APPLICATION_DEADLINE".equals(event.eventType()) ? Outcome.IMMEDIATE : Outcome.DIGEST;
+                    "APPLICATION_DEADLINE".equals(eventType) ? Outcome.IMMEDIATE : Outcome.DIGEST;
             case "REGION_ONLY" -> !regionMatch ? Outcome.IGNORE
                     : (finalScore >= 4 ? Outcome.IMMEDIATE : Outcome.DIGEST);
             case "DAILY_DIGEST_ONLY" -> Outcome.DIGEST;
@@ -146,7 +150,7 @@ public class NotificationDispatcher {
 
     private void deliver(OutboxEvent event, EventContext ctx, Candidate user, LocalDate today, int finalScore) {
         String dedupKey = dedupKey(user.anonymousId(), event, today);
-        List<Token> tokens = devices(user.anonymousId());
+        List<Device> tokens = devices(user.anonymousId());
         String channel = tokens.isEmpty() ? "IN_APP" : "PUSH";
 
         Long logId = jdbcClient.sql("""
@@ -217,7 +221,7 @@ public class NotificationDispatcher {
         }
         PendingDelivery first = deliveries.get(0);
         try {
-            List<Token> tokens = devices(first.anonymousId());
+            List<Device> tokens = devices(first.anonymousId());
             if (tokens.isEmpty()) {
                 markDelivery(deliveries, "SENT", true);
                 return;
@@ -240,15 +244,18 @@ public class NotificationDispatcher {
         }
     }
 
-    private PushAttempt send(List<Token> tokens, String title, String body) {
+    private PushAttempt send(List<Device> devices, String title, String body) {
         boolean anySuccess = false;
         String lastReason = null;
-        for (Token token : tokens) {
-            PushResult result = pushSender.send(token.token(), title, body);
+        for (Device device : devices) {
+            PushSender sender = pushSenders.get(device.kind());
+            PushResult result = sender == null
+                    ? PushResult.fail("NO_SENDER_" + device.kind())
+                    : sender.send(device.target(), title, body);
             if (result.success()) {
                 anySuccess = true;
                 jdbcClient.sql("UPDATE user_devices SET last_success_at=now(), failure_count=0 WHERE id=:id")
-                        .param("id", token.id()).update();
+                        .param("id", device.id()).update();
             } else {
                 lastReason = result.failureReason();
                 jdbcClient.sql("""
@@ -256,7 +263,7 @@ public class NotificationDispatcher {
                         SET last_failure_at=now(), failure_count=failure_count+1,
                             push_enabled = CASE WHEN failure_count+1 >= 3 THEN false ELSE push_enabled END
                         WHERE id=:id
-                        """).param("id", token.id()).update();
+                        """).param("id", device.id()).update();
             }
         }
         return new PushAttempt(anySuccess, lastReason);
@@ -339,11 +346,15 @@ public class NotificationDispatcher {
                 .param("id", anonymousId).query(String.class).set();
     }
 
-    private List<Token> devices(UUID anonymousId) {
-        return jdbcClient.sql(
-                "SELECT id, device_token FROM user_devices WHERE anonymous_id=:id AND push_enabled=true")
+    private List<Device> devices(UUID anonymousId) {
+        return jdbcClient.sql("""
+                SELECT id, kind, device_token, endpoint, p256dh, auth
+                FROM user_devices WHERE anonymous_id=:id AND push_enabled=true
+                """)
                 .param("id", anonymousId)
-                .query((rs, n) -> new Token(rs.getLong("id"), rs.getString("device_token")))
+                .query((rs, n) -> new Device(rs.getLong("id"), rs.getString("kind"),
+                        rs.getString("device_token"), rs.getString("endpoint"),
+                        rs.getString("p256dh"), rs.getString("auth")))
                 .list();
     }
 
@@ -434,7 +445,13 @@ public class NotificationDispatcher {
                              boolean dailyDigestEnabled, LocalTime dailyDigestTime,
                              LocalTime dndStart, LocalTime dndEnd) {}
 
-    private record Token(long id, String token) {}
+    private record Device(long id, String kind, String token, String endpoint, String p256dh, String auth) {
+        PushTarget target() {
+            return "WEBPUSH".equals(kind)
+                    ? PushTarget.webpush(endpoint, p256dh, auth)
+                    : PushTarget.fcm(token);
+        }
+    }
 
     private record PendingDelivery(long logId, UUID anonymousId, OutboxEvent event,
                                    String channel, int finalScore) {}

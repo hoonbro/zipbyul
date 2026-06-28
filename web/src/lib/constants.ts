@@ -21,8 +21,8 @@ export const INTEREST_TYPES: InterestTypeOption[] = [
   { code: 'POLICY_RATE', label: '정책·금리', available: true },
   { code: 'TRANSACTION', label: '실거래 등록', available: true },
   { code: 'HOUSE_PRICE_OUTLOOK', label: '집값 전망 심리', available: true },
-  { code: 'YOUTH_SAFE_HOUSE', label: '청년안심주택', available: false },
-  { code: 'LONG_TERM_JEONSE', label: '장기전세', available: false },
+  { code: 'YOUTH_SAFE_HOUSE', label: '청년안심주택', available: true },
+  { code: 'LONG_TERM_JEONSE', label: '장기전세', available: true },
 ]
 
 export interface AlertLevelOption {
@@ -49,6 +49,7 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   WINNER_ANNOUNCEMENT: '당첨자 발표',
   CONTRACT: '계약',
   RATE_DECISION: '기준금리 결정',
+  POLICY_ANNOUNCEMENT: '정책 발표',
   TRANSACTION_NEW: '실거래 등록',
   MARKET_INDEX_UPDATED: '집값전망 갱신',
 }
@@ -69,6 +70,8 @@ export const SUPPLY_TYPE_LABELS: Record<string, string> = {
   NATIONAL_RENTAL: '국민임대',
   PURCHASE_RENTAL: '매입임대',
   JEONSE_RENTAL: '전세임대',
+  YOUTH_SAFE_HOUSE: '청년안심주택',
+  LONG_TERM_JEONSE: '장기전세',
 }
 
 /** 공고 목록 필터에 노출할 공급유형. */
@@ -78,4 +81,6 @@ export const ANNOUNCEMENT_SUPPLY_FILTERS = [
   'PUBLIC_SALE',
   'HAPPY_HOUSE',
   'PURCHASE_RENTAL',
+  'YOUTH_SAFE_HOUSE',
+  'LONG_TERM_JEONSE',
 ] as const

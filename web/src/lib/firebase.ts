@@ -55,7 +55,8 @@ export async function registerPush(): Promise<PushResult> {
   }
   const m = await getMessagingIfSupported()
   if (!m) {
-    return { ok: false, reason: 'unsupported' }
+    // FCM 미지원(iOS PWA 등) → 표준 WebPush 폴백
+    return supportsWebPush() ? subscribeWebPush() : { ok: false, reason: 'unsupported' }
   }
   try {
     const permission = await Notification.requestPermission()
@@ -72,11 +73,72 @@ export async function registerPush(): Promise<PushResult> {
     }
     const device = await apiFetch<DeviceResponse>('/v1/devices', {
       method: 'POST',
-      body: { deviceToken: token },
+      body: { kind: 'FCM', deviceToken: token },
       withAnonymousId: true,
     })
     localStorage.setItem(DEVICE_ID_KEY, String(device.id))
     return { ok: true, token }
+  } catch {
+    return { ok: false, reason: 'error' }
+  }
+}
+
+function supportsWebPush(): boolean {
+  return (
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    typeof Notification !== 'undefined'
+  )
+}
+
+function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const normalized = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(normalized)
+  const out = new Uint8Array(new ArrayBuffer(raw.length))
+  for (let i = 0; i < raw.length; i += 1) {
+    out[i] = raw.charCodeAt(i)
+  }
+  return out
+}
+
+/**
+ * 표준 WebPush(VAPID) 구독 → 백엔드 기기 등록. iOS는 16.4+ & 홈화면 설치 PWA에서만 동작.
+ * VAPID 공개키는 서버(/v1/push/vapid-public-key)에서 받아 단일 출처를 유지한다.
+ */
+async function subscribeWebPush(): Promise<PushResult> {
+  try {
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      return { ok: false, reason: 'denied' }
+    }
+    const reg = await navigator.serviceWorker.register('/webpush/webpush-sw.js', {
+      scope: '/webpush/',
+    })
+    const { publicKey } = await apiFetch<{ publicKey: string }>('/v1/push/vapid-public-key')
+    if (!publicKey) {
+      return { ok: false, reason: 'config-missing' }
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    })
+    const json = sub.toJSON()
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+      return { ok: false, reason: 'no-token' }
+    }
+    const device = await apiFetch<DeviceResponse>('/v1/devices', {
+      method: 'POST',
+      body: {
+        kind: 'WEBPUSH',
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+      },
+      withAnonymousId: true,
+    })
+    localStorage.setItem(DEVICE_ID_KEY, String(device.id))
+    return { ok: true, token: json.endpoint }
   } catch {
     return { ok: false, reason: 'error' }
   }

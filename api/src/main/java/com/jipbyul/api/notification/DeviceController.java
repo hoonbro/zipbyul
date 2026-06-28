@@ -2,7 +2,6 @@ package com.jipbyul.api.notification;
 
 import com.jipbyul.api.notification.dto.DeviceRequest;
 import com.jipbyul.api.notification.dto.DeviceResponse;
-import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,9 +27,9 @@ public class DeviceController {
     @PostMapping
     public ResponseEntity<DeviceResponse> register(
             @RequestHeader("X-Anonymous-Id") UUID anonymousId,
-            @Valid @RequestBody DeviceRequest request) {
+            @RequestBody DeviceRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.register(anonymousId, request.deviceToken()));
+                .body(service.register(anonymousId, request));
     }
 
     @DeleteMapping("/{id}")

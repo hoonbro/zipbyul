@@ -18,10 +18,11 @@
     section { background: #131825; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
     h2 { font-size: 14px; margin: 0 0 12px; color: #9aa7ff; }
     label { font-size: 12px; color: #8a97ab; }
-    input {
+    input, select {
       background: #0b0e14; border: 1px solid rgba(255,255,255,.12); color: #e7edf5;
       border-radius: 8px; padding: 8px 10px; font: inherit; width: 320px; max-width: 100%;
     }
+    input[type=date], select { width: auto; }
     button {
       background: #3df5c5; color: #04201a; border: 0; border-radius: 8px;
       padding: 7px 12px; font: inherit; font-weight: 700; cursor: pointer; margin: 2px;
@@ -35,7 +36,7 @@
     .tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
     .PENDING { background: rgba(255,206,90,.15); color: #ffce5a; }
     .RUNNING { background: rgba(91,168,255,.15); color: #5ba8ff; }
-    .SUCCESS { background: rgba(61,245,197,.15); color: #3df5c5; }
+    .SUCCESS, .DONE { background: rgba(61,245,197,.15); color: #3df5c5; }
     .FAILED  { background: rgba(255,123,136,.15); color: #ff7b88; }
     .muted { color: #6b7688; }
     #msg { font-size: 12px; min-height: 16px; color: #ff7b88; }
@@ -66,6 +67,45 @@
       <button class="run-collect" data-source="ecos">ecos</button>
       <button class="ghost" id="runNotif">알림 워커 1회 실행</button>
     </div>
+  </section>
+
+  <section>
+    <h2>정책 일정 추가 <span class="muted" style="font-size:11px">· 비기준금리 정책(청약제도 변경 등) 수동 등록</span></h2>
+    <div class="row">
+      <input id="pTitle" placeholder="제목 (예: 청약제도 개편 시행)" />
+      <input id="pDate" type="date" style="width:auto" />
+      <input id="pUrl" placeholder="원문 링크 (선택)" />
+      <button id="addPolicy">등록</button>
+    </div>
+    <table id="policy" style="margin-top:12px"><thead><tr>
+      <th>#</th><th>제목</th><th>일정</th><th>링크</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>SH 공공임대 공고 추가 <span class="muted" style="font-size:11px">· 청년안심주택·장기전세 수동 등록 (큐 → 수집기 적재)</span></h2>
+    <div class="row" style="margin-bottom:8px">
+      <select id="aType">
+        <option value="YOUTH_SAFE_HOUSE">청년안심주택</option>
+        <option value="LONG_TERM_JEONSE">장기전세</option>
+      </select>
+      <input id="aTitle" placeholder="공고 제목" />
+      <input id="aGu" placeholder="자치구 (예: 강남구)" style="width:160px" />
+      <input id="aDong" placeholder="법정동 (선택, 예: 역삼동)" style="width:200px" />
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <label>접수시작 <input id="aStart" type="date" /></label>
+      <label>접수마감 <input id="aEnd" type="date" /></label>
+      <label>당첨발표 <input id="aWinner" type="date" /></label>
+      <label>계약 <input id="aContract" type="date" /></label>
+    </div>
+    <div class="row">
+      <input id="aUrl" placeholder="원문 링크 (선택)" />
+      <button id="addAnn">큐 등록</button>
+    </div>
+    <table id="annq" style="margin-top:12px"><thead><tr>
+      <th>#</th><th>상태</th><th>공고ID</th><th>메시지</th><th>요청</th>
+    </tr></thead><tbody></tbody></table>
   </section>
 
   <section>
@@ -150,10 +190,73 @@
       } catch (e) { /* 토큰 없거나 오류 — 헬스 쪽 메시지로 충분 */ }
     }
 
+    async function loadPolicy() {
+      try {
+        const rows = await api('/internal/admin/policy?limit=20');
+        $('#policy tbody').innerHTML = rows.map((p) => `
+          <tr>
+            <td>${p.id}</td>
+            <td>${p.title}</td>
+            <td class="muted">${p.eventDate}</td>
+            <td class="muted">${p.sourceUrl ? `<a href="${p.sourceUrl}" target="_blank" rel="noopener" style="color:#5ba8ff">링크</a>` : '—'}</td>
+          </tr>`).join('');
+      } catch (e) { /* 토큰 없거나 오류 — 헬스 쪽 메시지로 충분 */ }
+    }
+
+    $('#addPolicy').onclick = async () => {
+      const title = $('#pTitle').value.trim();
+      const eventDate = $('#pDate').value;
+      if (!title || !eventDate) { note('제목과 날짜를 입력하세요.'); return; }
+      try {
+        const p = await api('/internal/admin/policy', { method: 'POST', body: {
+          title, eventDate, sourceUrl: $('#pUrl').value.trim() || null,
+        } });
+        note(`정책 일정 #${p.id} 등록됨`, true);
+        $('#pTitle').value = ''; $('#pUrl').value = '';
+        loadPolicy();
+      } catch (e) { note('정책 일정 등록 실패: ' + e.message); }
+    };
+
+    async function loadAnnQueue() {
+      try {
+        const rows = await api('/internal/admin/announcement?limit=20');
+        $('#annq tbody').innerHTML = rows.map((q) => `
+          <tr>
+            <td>${q.id}</td>
+            <td><span class="tag ${q.status}">${q.status}</span></td>
+            <td class="muted">${q.announcementId || '—'}</td>
+            <td class="muted">${q.message || '—'}</td>
+            <td class="muted">${fmt(q.requestedAt)}</td>
+          </tr>`).join('');
+      } catch (e) { /* 토큰 없거나 오류 — 헬스 쪽 메시지로 충분 */ }
+    }
+
+    $('#addAnn').onclick = async () => {
+      const title = $('#aTitle').value.trim();
+      const guName = $('#aGu').value.trim();
+      if (!title || !guName) { note('제목과 자치구를 입력하세요.'); return; }
+      try {
+        const q = await api('/internal/admin/announcement', { method: 'POST', body: {
+          title,
+          supplyType: $('#aType').value,
+          guName,
+          dongName: $('#aDong').value.trim() || null,
+          applyStart: $('#aStart').value || null,
+          applyEnd: $('#aEnd').value || null,
+          winnerDate: $('#aWinner').value || null,
+          contractDate: $('#aContract').value || null,
+          sourceUrl: $('#aUrl').value.trim() || null,
+        } });
+        note(`공고 큐 #${q.id} 등록됨 (수집기 처리 대기)`, true);
+        $('#aTitle').value = ''; $('#aDong').value = ''; $('#aUrl').value = '';
+        loadAnnQueue();
+      } catch (e) { note('공고 큐 등록 실패: ' + e.message); }
+    };
+
     $('#saveToken').onclick = () => {
       sessionStorage.setItem(TOKEN_KEY, $('#token').value.trim());
       note('토큰 저장됨', true);
-      loadHealth(); loadJobs();
+      loadHealth(); loadJobs(); loadPolicy(); loadAnnQueue();
     };
     $('#refreshHealth').onclick = loadHealth;
 
@@ -174,8 +277,8 @@
       } catch (e) { note('알림 워커 실행 실패: ' + e.message); }
     };
 
-    if (getToken()) { loadHealth(); loadJobs(); }
-    setInterval(loadJobs, 3000);
+    if (getToken()) { loadHealth(); loadJobs(); loadPolicy(); loadAnnQueue(); }
+    setInterval(() => { loadJobs(); loadAnnQueue(); }, 3000);
   </script>
 </body>
 </html>

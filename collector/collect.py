@@ -15,6 +15,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from jipbyul_collector.adapters.base import BaseAdapter
 from jipbyul_collector.adapters.applyhome import ApplyhomeAptAdapter, ApplyhomeUnrankedAdapter
 from jipbyul_collector.adapters.ecos import EcosAdapter
 from jipbyul_collector.adapters.lh import LhNoticeAdapter
@@ -55,6 +56,8 @@ def run_scheduled() -> None:
     sched = BlockingScheduler(timezone="Asia/Seoul")
     # 운영자 수기 수집 잡(collection_job) 폴링 — 30초 간격
     sched.add_job(drain_collection_jobs, IntervalTrigger(seconds=30), id="manual_collect_drain")
+    # 운영자 수동 SH 공고 큐(manual_announcement_queue) 폴링 — 30초 간격
+    sched.add_job(drain_manual_announcements, IntervalTrigger(seconds=30), id="manual_announcement_drain")
     # 청약홈 / LH — 1일 2회 (08:00, 20:00)
     sched.add_job(lambda: run_all("applyhome"), CronTrigger(hour="8,20", minute=0))
     sched.add_job(lambda: run_all("lh"),        CronTrigger(hour="8,20", minute=5))
@@ -110,6 +113,102 @@ def drain_collection_jobs() -> None:
         )
         conn.commit()
     logger.info("✓ 수기 수집 잡 #%s → %s", job_id, status)
+
+
+class _ManualEmitter(BaseAdapter):
+    """수동 공고 드레인 전용 — emit_event(domain_event 발행)만 재사용. 외부 호출 없음."""
+    source_code = "ADMIN_MANUAL"
+
+    def __init__(self) -> None:  # emit_event는 httpx client 불필요
+        pass
+
+    def run(self) -> int:
+        return 0
+
+
+def drain_manual_announcements() -> None:
+    """운영자 수동 SH 공고 큐를 1건 처리. Spring은 큐에만 쓰고 본체 적재는 여기서.
+
+    기존 upsert_announcement(이벤트 발행·캘린더 동기화) + upsert_units를 그대로 재사용한다.
+    """
+    from jipbyul_collector.common.db import get_conn
+    from jipbyul_collector.normalize.announcement import _make_hash, upsert_announcement
+    from jipbyul_collector.normalize.announcement_unit import upsert_units
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, payload FROM manual_announcement_queue
+            WHERE status = 'PENDING'
+            ORDER BY requested_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return
+        qid, payload = row["id"], row["payload"]
+        conn.execute(
+            "UPDATE manual_announcement_queue SET status='RUNNING' WHERE id=%s", (qid,)
+        )
+        conn.commit()
+
+    source_ref_id = f"MANUAL-{qid}"
+    logger.info("▶ 수동 공고 큐 #%s (%s) 처리", qid, payload.get("supplyType"))
+    try:
+        upsert_announcement(
+            source_code="ADMIN_MANUAL",
+            source_ref_id=source_ref_id,
+            pblanc_no=None,
+            title=payload.get("title"),
+            supply_type=payload.get("supplyType"),
+            gu_name=payload.get("guName"),
+            bjd_code=None,
+            apply_start=payload.get("applyStart"),
+            apply_end=payload.get("applyEnd"),
+            winner_date=payload.get("winnerDate"),
+            contract_date=payload.get("contractDate"),
+            source_url=payload.get("sourceUrl"),
+            summary_json={"manual": True},
+            emitter=_ManualEmitter().emit_event,
+            dong_name=payload.get("dongName"),
+        )
+        units = [
+            {
+                "house_type": u.get("houseType"),
+                "area_m2": u.get("areaM2"),
+                "supply_count": u.get("supplyCount"),
+                "supply_amount_manwon": u.get("supplyAmountManwon"),
+            }
+            for u in (payload.get("units") or [])
+        ]
+        upsert_units("ADMIN_MANUAL", source_ref_id, units)
+
+        with get_conn() as conn:
+            ann = conn.execute(
+                "SELECT id FROM housing_announcements WHERE dedup_hash = %s",
+                (_make_hash("ADMIN_MANUAL", source_ref_id),),
+            ).fetchone()
+            conn.execute(
+                """
+                UPDATE manual_announcement_queue
+                SET status='DONE', announcement_id=%s, processed_at=now() WHERE id=%s
+                """,
+                (ann["id"] if ann else None, qid),
+            )
+            conn.commit()
+        logger.info("✓ 수동 공고 큐 #%s → DONE (공고 #%s)", qid, ann["id"] if ann else None)
+    except Exception as e:  # noqa: BLE001 — 잡 실패는 기록하고 스케줄러는 계속
+        logger.exception("수동 공고 큐 #%s 실패", qid)
+        with get_conn() as conn:
+            conn.execute(
+                """
+                UPDATE manual_announcement_queue
+                SET status='FAILED', message=%s, processed_at=now() WHERE id=%s
+                """,
+                (str(e)[:500], qid),
+            )
+            conn.commit()
 
 
 def backfill_calendar() -> None:

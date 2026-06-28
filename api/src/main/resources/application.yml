@@ -18,6 +18,13 @@ fcm:
   credentials-path: ${FCM_CREDENTIALS_JSON:}
   project-id: ${FCM_PROJECT_ID:}
 
+# 표준 WebPush(VAPID) — iOS PWA용. 키 미설정 시 WebPush 발송 비활성.
+webpush:
+  vapid:
+    public-key: ${WEBPUSH_VAPID_PUBLIC_KEY:}
+    private-key: ${WEBPUSH_VAPID_PRIVATE_KEY:}
+    subject: ${WEBPUSH_VAPID_SUBJECT:mailto:admin@example.com}
+
 # /internal/* 보호용 토큰. 미설정 시 /internal/* 는 모두 403(fail-closed).
 internal:
   api-token: ${INTERNAL_API_TOKEN:}

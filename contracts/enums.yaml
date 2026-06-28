@@ -6,8 +6,8 @@ interest_type:    # 관심유형 (목업 9종) — 온보딩·피드·알림 필
   - { code: PRIVATE_SALE_SUB,    label: 민간청약,        mvp: true,        match: "supply_type {PRIVATE_SALE, OFFICETEL}" }
   - { code: UNRANKED_SUB,        label: 무순위 청약,     mvp: true,        match: "supply_type {UNRANKED}" }
   - { code: HAPPY_HOUSE,         label: 행복주택,        mvp: true,        match: "LH {HAPPY_HOUSE, NATIONAL_RENTAL}" }
-  - { code: YOUTH_SAFE_HOUSE,    label: 청년안심주택,    mvp: false,       match: "SH source — MVP 콘텐츠 없음, 개발 예정 표시" }
-  - { code: LONG_TERM_JEONSE,    label: 장기전세,        mvp: false,       match: "SH source — MVP 콘텐츠 없음, 개발 예정 표시" }
+  - { code: YOUTH_SAFE_HOUSE,    label: 청년안심주택,    mvp: false,       match: "supply_type {YOUTH_SAFE_HOUSE} — SH, 운영자 수동 입력(백오피스)" }
+  - { code: LONG_TERM_JEONSE,    label: 장기전세,        mvp: false,       match: "supply_type {LONG_TERM_JEONSE} — SH, 운영자 수동 입력(백오피스)" }
   - { code: PURCHASE_RENTAL,     label: 매입임대,        mvp: true,        match: "LH {PURCHASE_RENTAL, JEONSE_RENTAL}" }
   - { code: POLICY_RATE,         label: 정책·금리,       mvp: true,        match: "policy_events(RATE_DECISION); 비기준금리 정책은 2차" }
   - { code: TRANSACTION,         label: 실거래 등록,     mvp: true,        match: "real_estate_transactions(TRANSACTION_NEW)" }
@@ -35,6 +35,8 @@ supply_type:      # 공급유형
   - { code: NATIONAL_RENTAL, label: LH 국민임대 }
   - { code: PURCHASE_RENTAL, label: LH 매입임대 }
   - { code: JEONSE_RENTAL,   label: LH 전세임대 }
+  - { code: YOUTH_SAFE_HOUSE, label: 청년안심주택 }   # SH, 운영자 수동 입력
+  - { code: LONG_TERM_JEONSE, label: 장기전세 }       # SH, 운영자 수동 입력
 
 trade_type:       # 실거래
   - { code: SALE,    label: 매매 }

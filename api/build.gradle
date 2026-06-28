@@ -24,6 +24,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'com.google.firebase:firebase-admin:9.4.3'
+    implementation 'nl.martijndwars:web-push:5.1.1'   // 표준 WebPush(VAPID) — iOS PWA용
+    // web-push 5.1.1은 BouncyCastle을 transitive로 끌어오지 않음(provided) → 명시 추가(빌드된 1.70 jdk15on에 맞춤)
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
+    implementation 'org.bouncycastle:bcpkix-jdk15on:1.70'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

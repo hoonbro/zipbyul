@@ -5,6 +5,7 @@ from jipbyul_collector.adapters.applyhome import (
     _gu_from_addr,
     _map_mdl_unit,
     _map_supply,
+    _pblpvtrent_fields,
     _price_cap,
 )
 from jipbyul_collector.adapters.lh import _map_supply as lh_map_supply
@@ -70,6 +71,29 @@ def test_map_mdl_unit_handles_missing_and_commas():
     assert out["supply_count"] is None
     # 주택형 없으면 전용 파싱 불가 → None
     assert _map_mdl_unit({})["area_m2"] is None
+
+
+def test_pblpvtrent_fields_maps_youth_safe_house():
+    item = {
+        "PBLANC_NO": "2025850026",
+        "HOUSE_NM": "서울은평뉴타운 디에트르 더 퍼스트(3-14BL)",
+        "HSSPLY_ADRES": "서울특별시 은평구 진관동 144",
+        "SUBSCRPT_RCEPT_BGNDE": "20250916",
+        "SUBSCRPT_RCEPT_ENDDE": "20250917",
+        "PRZWNER_PRESNATN_DE": "20250922",
+        "RCRIT_PBLANC_DE": "20250911",
+        "TOT_SUPLY_HSHLDCO": "4",
+        "PBLANC_URL": "https://www.applyhome.co.kr/x",
+    }
+    out = _pblpvtrent_fields(item)
+    assert out["supply_type"] == "YOUTH_SAFE_HOUSE"  # 공공지원민간임대 → 청년안심주택
+    assert out["gu_name"] == "은평구"
+    assert out["dong_name"] == "진관동"
+    assert out["source_ref_id"] == "2025850026"
+    assert out["apply_start"] == "20250916"
+    assert out["apply_end"] == "20250917"
+    assert out["winner_date"] == "20250922"
+    assert out["source_url"] == "https://www.applyhome.co.kr/x"
 
 
 def test_price_cap_accepts_english_and_korean_keys():

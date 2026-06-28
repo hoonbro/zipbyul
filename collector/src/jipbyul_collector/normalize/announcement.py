@@ -105,8 +105,9 @@ def upsert_announcement(
 
         today = date.today()
 
-        if is_insert:
-            # 신규 공고
+        if is_insert and (apply_end_d is None or apply_end_d >= today):
+            # 신규 공고. 단, 첫 수집 백필로 들어온 이미-마감 공고(apply_end 과거)는
+            # "새 공고"로 알리지 않는다 — 끝난 공고 알림은 무의미하고 알림함을 오염시킨다.
             emitter(conn, "ANNOUNCEMENT_NEW", "ANNOUNCEMENT", ann_id,
                     gu_name, bjd_code, _SCORE["ANNOUNCEMENT_NEW"], f"ANN_NEW:{dedup_hash}")
 

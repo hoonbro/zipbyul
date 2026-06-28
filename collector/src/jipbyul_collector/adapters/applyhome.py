@@ -37,6 +37,8 @@ _SUPPLY_TYPE_MAP = {
 _BASE             = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1"
 _APT_URL          = f"{_BASE}/getAPTLttotPblancDetail"
 _UNRANKED_URL     = f"{_BASE}/getRemndrLttotPblancDetail"
+# 공공지원민간임대(청년안심주택 포함) — 같은 서비스(15098547)·같은 서비스키
+_PBLPVTRENT_URL   = f"{_BASE}/getPblPvtRentLttotPblancDetail"
 # 주택형별 분양가(안전마진 §2-2). 헤더와 같은 서비스(15098547), 같은 서비스키.
 _APT_MDL_URL      = f"{_BASE}/getAPTLttotPblancMdl"
 _UNRANKED_MDL_URL = f"{_BASE}/getRemndrLttotPblancMdl"
@@ -174,6 +176,62 @@ class ApplyhomeUnrankedAdapter(BaseAdapter):
         unit_count = _collect_units(self.client, _UNRANKED_MDL_URL, self.source_code, seoul_pnos)
         logger.info("[%s] 서울 %d/%d건 (신규 %d), 주택형 %d건",
                     self.source_code, len(seoul_items), len(items), count, unit_count)
+        return count
+
+
+def _pblpvtrent_fields(item: dict) -> dict:
+    """공공지원민간임대 한 행 → upsert_announcement 인자(dict). 순수 함수(테스트용).
+
+    HOUSE_SECD_NM은 전부 '공공지원민간임대'. 청년안심주택은 그 부분집합이라
+    가장 근접한 관심유형인 YOUTH_SAFE_HOUSE로 묶는다(부록 A 매핑 규칙).
+    임대라 분양가상한제·주택형(Mdl)은 적재하지 않는다.
+    """
+    return {
+        "source_ref_id": item["PBLANC_NO"],
+        "pblanc_no":     item.get("PBLANC_NO"),
+        "title":         item.get("HOUSE_NM", ""),
+        "supply_type":   "YOUTH_SAFE_HOUSE",
+        "gu_name":       _gu_from_addr(item.get("HSSPLY_ADRES", "")),
+        "dong_name":     _dong_from_addr(item.get("HSSPLY_ADRES")),
+        "complex_norm":  _complex_norm(item.get("HOUSE_NM")),
+        "apply_start":   item.get("SUBSCRPT_RCEPT_BGNDE"),
+        "apply_end":     item.get("SUBSCRPT_RCEPT_ENDDE"),
+        "winner_date":   item.get("PRZWNER_PRESNATN_DE"),
+        "contract_date": item.get("CNTRCT_CNCLS_BGNDE"),
+        "source_url":    item.get("PBLANC_URL"),
+        "summary_json":  {
+            "공급규모":   item.get("TOT_SUPLY_HSHLDCO"),
+            "모집공고일": item.get("RCRIT_PBLANC_DE"),
+            "사업주체":   item.get("BSNS_MBY_NM"),
+        },
+    }
+
+
+class ApplyhomePblPvtRentAdapter(BaseAdapter):
+    """청약홈 공공지원민간임대(청년안심주택 포함) — getPblPvtRentLttotPblancDetail.
+
+    장기전세는 청약홈에 없어(SH 자체 시스템) 수기 큐로만 입력된다.
+    """
+    source_code = "APPLYHOME_PBLPVTRENT"
+
+    def run(self) -> int:
+        items, raw_pages = _fetch_all_pages(self.client, _PBLPVTRENT_URL, {})
+        with get_conn() as conn:
+            for payload in raw_pages:
+                self.save_raw(conn, payload)
+        seoul_items = [i for i in items if _is_seoul(i)]
+        count = 0
+        for item in seoul_items:
+            is_new = upsert_announcement(
+                source_code = self.source_code,
+                bjd_code    = None,
+                emitter     = self.emit_event,
+                **_pblpvtrent_fields(item),
+            )
+            if is_new:
+                count += 1
+        logger.info("[%s] 서울 %d/%d건 upsert (신규 %d)",
+                    self.source_code, len(seoul_items), len(items), count)
         return count
 
 

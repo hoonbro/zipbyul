@@ -16,7 +16,11 @@ import httpx
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from jipbyul_collector.adapters.base import BaseAdapter
-from jipbyul_collector.adapters.applyhome import ApplyhomeAptAdapter, ApplyhomeUnrankedAdapter
+from jipbyul_collector.adapters.applyhome import (
+    ApplyhomeAptAdapter,
+    ApplyhomePblPvtRentAdapter,
+    ApplyhomeUnrankedAdapter,
+)
 from jipbyul_collector.adapters.ecos import EcosAdapter
 from jipbyul_collector.adapters.lh import LhNoticeAdapter
 from jipbyul_collector.adapters.molit import MolitAdapter
@@ -30,8 +34,9 @@ logging.basicConfig(
 logger = logging.getLogger("collect")
 
 _ADAPTERS = {
-    "applyhome_apt":      ApplyhomeAptAdapter,
-    "applyhome_unranked": ApplyhomeUnrankedAdapter,
+    "applyhome_apt":         ApplyhomeAptAdapter,
+    "applyhome_unranked":    ApplyhomeUnrankedAdapter,
+    "applyhome_pblpvtrent":  ApplyhomePblPvtRentAdapter,
     "lh":                 LhNoticeAdapter,
     "molit":              MolitAdapter,
     "ecos":               EcosAdapter,

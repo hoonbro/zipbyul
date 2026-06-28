@@ -27,7 +27,7 @@ _APIS = {
     "APT_SALE":     ("RTMSDataSvcAptTradeDev",      "getRTMSDataSvcAptTradeDev",  "SALE",    "aptNm",     "11680"),
     "APT_RENT":     ("RTMSDataSvcAptRent",           "getRTMSDataSvcAptRent",      "JEONSE",  "aptNm",     None),
     "VILLA_SALE":   ("RTMSDataSvcRHTrade",           "getRTMSDataSvcRHTrade",      "SALE",    "연립다세대", None),
-    "VILLA_RENT":   ("RTMSDataSvcSHRent",            "getRTMSDataSvcSHRent",       "JEONSE",  "연립다세대", None),
+    "VILLA_RENT":   ("RTMSDataSvcRHRent",            "getRTMSDataSvcRHRent",       "JEONSE",  "연립다세대", None),
     "OFFICETEL_SALE":("RTMSDataSvcOffiTrade",        "getRTMSDataSvcOffiTrade",    "SALE",    "단지",      None),
     "OFFICETEL_RENT":("RTMSDataSvcOffiRent",         "getRTMSDataSvcOffiRent",     "JEONSE",  "단지",      None),
 }
@@ -61,28 +61,36 @@ class MolitAdapter(BaseAdapter):
     """아파트 매매·전월세 실거래가 수집."""
     source_code = "MOLIT_APT_TRADE"   # 잡로그·헬스 대표 코드
 
+    _ENDPOINTS = [
+        ("MOLIT_APT_TRADE",   "RTMSDataSvcAptTradeDev", "getRTMSDataSvcAptTradeDev", "SALE"),
+        ("MOLIT_APT_PRESALE", "RTMSDataSvcSilvTrade",   "getRTMSDataSvcSilvTrade",   "PRESALE"),
+        ("MOLIT_APT_RENT",    "RTMSDataSvcAptRent",     "getRTMSDataSvcAptRent",     "JEONSE"),
+        ("MOLIT_VILLA_TRADE", "RTMSDataSvcRHTrade",     "getRTMSDataSvcRHTrade",     "SALE"),
+        ("MOLIT_VILLA_RENT",  "RTMSDataSvcRHRent",      "getRTMSDataSvcRHRent",      "JEONSE"),
+        ("MOLIT_OFFI_TRADE",  "RTMSDataSvcOffiTrade",   "getRTMSDataSvcOffiTrade",   "SALE"),
+        ("MOLIT_OFFI_RENT",   "RTMSDataSvcOffiRent",    "getRTMSDataSvcOffiRent",    "JEONSE"),
+    ]
+
     def run(self) -> int:
         months = _recent_months(3)
         total_new = 0
+        # 엔드포인트(=source_code)별 결과 집계 → 소스별 헬스 기록.
+        results = {src: {"ok": False, "err": None} for src, *_ in self._ENDPOINTS}
 
         for (src, svc_name, operation, base_trade_type), (lawd_cd, gu_name) in product(
-            [
-                ("MOLIT_APT_TRADE",   "RTMSDataSvcAptTradeDev", "getRTMSDataSvcAptTradeDev", "SALE"),
-                ("MOLIT_APT_PRESALE", "RTMSDataSvcSilvTrade",   "getRTMSDataSvcSilvTrade",   "PRESALE"),
-                ("MOLIT_APT_RENT",    "RTMSDataSvcAptRent",     "getRTMSDataSvcAptRent",     "JEONSE"),
-                ("MOLIT_VILLA_TRADE", "RTMSDataSvcRHTrade",     "getRTMSDataSvcRHTrade",     "SALE"),
-                ("MOLIT_VILLA_RENT",  "RTMSDataSvcSHRent",      "getRTMSDataSvcSHRent",      "JEONSE"),
-                ("MOLIT_OFFI_TRADE",  "RTMSDataSvcOffiTrade",   "getRTMSDataSvcOffiTrade",   "SALE"),
-                ("MOLIT_OFFI_RENT",   "RTMSDataSvcOffiRent",    "getRTMSDataSvcOffiRent",    "JEONSE"),
-            ],
-            SEOUL_GU.items(),
+            self._ENDPOINTS, SEOUL_GU.items(),
         ):
             for ym in months:
                 try:
                     new = self._collect_one(src, svc_name, operation, lawd_cd, gu_name, ym, base_trade_type)
                     total_new += new
+                    results[src]["ok"] = True
                 except Exception as e:
                     logger.warning("[%s] %s/%s 실패: %s", src, lawd_cd, ym, e)
+                    results[src]["err"] = str(e)[:300]
+
+        for src, r in results.items():
+            self._mark_source_health(r["ok"], r["err"], source_code=src)
 
         logger.info("[MOLIT] 완료 신규 %d건", total_new)
         return total_new

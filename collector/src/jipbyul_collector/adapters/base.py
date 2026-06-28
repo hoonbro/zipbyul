@@ -53,7 +53,10 @@ class BaseAdapter(ABC):
                 (self.source_code, status, count, reason, started),
             )
 
-    def _mark_source_health(self, ok: bool, reason: str | None = None) -> None:
+    def _mark_source_health(
+        self, ok: bool, reason: str | None = None, source_code: str | None = None
+    ) -> None:
+        code = source_code or self.source_code
         with get_conn() as conn:
             if ok:
                 conn.execute(
@@ -61,9 +64,12 @@ class BaseAdapter(ABC):
                     INSERT INTO source_health_status (source_code, last_success_at, display_available)
                     VALUES (%s, now(), true)
                     ON CONFLICT (source_code) DO UPDATE
-                        SET last_success_at = now(), display_available = true
+                        SET last_success_at = now(),
+                            last_failure_at = NULL,
+                            last_failure_reason = NULL,
+                            display_available = true
                     """,
-                    (self.source_code,),
+                    (code,),
                 )
             else:
                 conn.execute(
@@ -76,7 +82,7 @@ class BaseAdapter(ABC):
                             last_failure_reason = EXCLUDED.last_failure_reason,
                             display_available = false
                     """,
-                    (self.source_code, reason),
+                    (code, reason),
                 )
 
     # ── 공통 유틸 ─────────────────────────────────────────

@@ -1,4 +1,5 @@
 """LH 분양임대공고 어댑터."""
+import json
 import logging
 
 from ..common.db import get_conn
@@ -91,7 +92,11 @@ class LhNoticeAdapter(BaseAdapter):
                 "PAGE":  page,
             }, timeout=30)
             r.raise_for_status()
-            data = r.json()
+            # LH는 본문이 CP949인데 UTF-8로 선언될 때가 있어 폴백 디코딩.
+            try:
+                data = json.loads(r.content.decode("utf-8"))
+            except UnicodeDecodeError:
+                data = json.loads(r.content.decode("cp949"))
             raw_pages.append(data)
             batch = data[1].get("dsList", []) if isinstance(data, list) and len(data) > 1 else []
             total = int(batch[0].get("ALL_CNT", 0)) if batch else 0

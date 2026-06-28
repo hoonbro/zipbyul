@@ -20,5 +20,12 @@ public record RecentTransactionsResponse(List<Item> items, String notice) {
             LocalDate contractDate,
             String contractMonth,
             OffsetDateTime firstSeenAt,
-            String sourceName) {}
+            String sourceName,
+            Integer buildYear,
+            LocalDate registeredAt,
+            String buildingDong,
+            String dealingType,
+            String jibun,
+            BigDecimal landAreaM2,
+            Long monthlyRentManwon) {}
 }

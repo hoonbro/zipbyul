@@ -4,6 +4,8 @@ import type {
   AnnouncementDetail,
   AnnouncementList,
   CalendarItem,
+  ComplexSearchItem,
+  ComplexSummaryItem,
   FeedHome,
   HousePriceOutlook,
   NotificationLogItem,
@@ -122,6 +124,49 @@ export function useWatchSummary() {
   })
 }
 
+export function useWatchComplexes() {
+  return useQuery({
+    queryKey: ['watch', 'complexes'],
+    queryFn: () => apiFetch<ComplexSummaryItem[]>('/v1/watch/complexes', { withAnonymousId: true }),
+  })
+}
+
+export function useComplexSearch(gu: string | null, q: string) {
+  const term = q.trim()
+  return useQuery({
+    queryKey: ['complexes', gu, term],
+    enabled: !!gu,
+    queryFn: () => {
+      const qs = new URLSearchParams({ gu: gu! })
+      if (term) qs.set('q', term)
+      return apiFetch<ComplexSearchItem[]>(`/v1/complexes?${qs.toString()}`)
+    },
+  })
+}
+
+export function useAddWatchComplex() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { guName: string; complexNorm: string; displayName: string }) =>
+      apiFetch<void>('/v1/watch/complexes', { method: 'POST', body: input, withAnonymousId: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['watch', 'complexes'] }),
+  })
+}
+
+export function useRemoveWatchComplex() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { guName: string; complexNorm: string }) => {
+      const qs = new URLSearchParams({ guName: input.guName, complexNorm: input.complexNorm })
+      return apiFetch<void>(`/v1/watch/complexes?${qs.toString()}`, {
+        method: 'DELETE',
+        withAnonymousId: true,
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['watch', 'complexes'] }),
+  })
+}
+
 export function useRegions(gu: string | null) {
   return useQuery({
     queryKey: ['regions', gu],
@@ -134,6 +179,9 @@ export interface RecentTransactionParams {
   region?: string
   dong?: string
   bjdCode?: string
+  tradeType?: string
+  areaMin?: number
+  areaMax?: number
 }
 
 export function useRecentTransactions(params: RecentTransactionParams) {
@@ -141,6 +189,9 @@ export function useRecentTransactions(params: RecentTransactionParams) {
   if (params.region) qs.set('region', params.region)
   if (params.dong) qs.set('dong', params.dong)
   if (params.bjdCode) qs.set('bjdCode', params.bjdCode)
+  if (params.tradeType) qs.set('tradeType', params.tradeType)
+  if (params.areaMin != null) qs.set('areaMin', String(params.areaMin))
+  if (params.areaMax != null) qs.set('areaMax', String(params.areaMax))
   const query = qs.toString()
   return useQuery({
     queryKey: ['transactions', 'recent', params],

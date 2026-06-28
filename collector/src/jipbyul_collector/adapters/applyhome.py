@@ -250,10 +250,14 @@ def _gu_from_addr(addr: str) -> str | None:
 
 
 def _dong_from_addr(addr: str | None) -> str | None:
-    """주소에서 법정동명 파싱 (실거래 dong_name과 동일 텍스트로 매칭). 첫 'OO동'."""
+    """주소에서 법정동명 파싱 (실거래 dong_name과 동일 텍스트로 매칭). 첫 'OO동'.
+
+    (?!구): 강동구·성동구처럼 어간이 '동'으로 끝나는 자치구명이 법정동보다 앞서 나오므로,
+    뒤에 '구'가 붙는 토큰(강동구→강동)은 건너뛰고 실제 법정동을 잡는다.
+    """
     if not addr:
         return None
-    m = re.search(r"([가-힣]+동)", addr)
+    m = re.search(r"([가-힣]+동)(?!구)", addr)
     return m.group(1) if m else None
 
 

@@ -258,7 +258,13 @@ export default function Home() {
                       {t.floor != null && ` · ${t.floor}층`}
                     </div>
                   </div>
-                  {t.priceText && <span className="shrink-0 font-mono text-[15px] font-bold">{t.priceText}</span>}
+                  {t.priceText && (
+                    <span className="shrink-0 font-mono text-[14px] font-bold">
+                      {t.tradeType === 'MONTHLY' && t.monthlyRentManwon != null
+                        ? `${t.priceText} / ${t.monthlyRentManwon.toLocaleString()}만`
+                        : t.priceText}
+                    </span>
+                  )}
                 </li>
               )
             })}

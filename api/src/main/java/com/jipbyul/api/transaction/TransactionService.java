@@ -24,7 +24,9 @@ public class TransactionService {
     private static final String SELECT_PREFIX = """
             SELECT t.id, t.gu_name, t.dong_name, t.complex_name, t.trade_type,
                    t.area_m2, t.floor, t.price_manwon, t.contract_date, t.contract_month,
-                   t.first_seen_at, sr.name AS source_name
+                   t.first_seen_at, sr.name AS source_name,
+                   t.build_year, t.registered_at, t.building_dong, t.dealing_type,
+                   t.jibun, t.land_area_m2, t.monthly_rent_manwon
             FROM real_estate_transactions t
             JOIN source_registry sr ON sr.source_code = t.source_code
             """;
@@ -35,7 +37,12 @@ public class TransactionService {
         this.jdbcClient = jdbcClient;
     }
 
-    public RecentTransactionsResponse recent(String region, String dong, String bjdCode, int limit) {
+    private static final java.util.Set<String> TRADE_TYPES =
+            java.util.Set.of("SALE", "JEONSE", "MONTHLY", "PRESALE");
+
+    public RecentTransactionsResponse recent(
+            String region, String dong, String bjdCode, String tradeType,
+            Double areaMin, Double areaMax, int limit) {
         if (bjdCode != null && !bjdCode.isBlank()) {
             Region resolved = resolveBjd(bjdCode);
             region = resolved.guName();
@@ -53,6 +60,19 @@ public class TransactionService {
         if (dong != null && !dong.isBlank()) {
             sql.append(" AND t.dong_name = :dong");
         }
+        boolean filterTradeType = tradeType != null && !tradeType.isBlank();
+        if (filterTradeType) {
+            if (!TRADE_TYPES.contains(tradeType)) {
+                throw new ApiException(ErrorCode.INVALID_ENUM, "지원하지 않는 거래유형입니다: " + tradeType);
+            }
+            sql.append(" AND t.trade_type = :tradeType");
+        }
+        if (areaMin != null) {
+            sql.append(" AND t.area_m2 >= :areaMin");
+        }
+        if (areaMax != null) {
+            sql.append(" AND t.area_m2 < :areaMax");
+        }
         sql.append(" ORDER BY t.first_seen_at DESC LIMIT :limit");
 
         StatementSpec spec = jdbcClient.sql(sql.toString()).param("limit", limit);
@@ -62,6 +82,15 @@ public class TransactionService {
         if (dong != null && !dong.isBlank()) {
             spec = spec.param("dong", dong);
         }
+        if (filterTradeType) {
+            spec = spec.param("tradeType", tradeType);
+        }
+        if (areaMin != null) {
+            spec = spec.param("areaMin", areaMin);
+        }
+        if (areaMax != null) {
+            spec = spec.param("areaMax", areaMax);
+        }
 
         List<Item> items = spec.query(this::mapItem).list();
         return new RecentTransactionsResponse(items, NOTICE);
@@ -70,7 +99,7 @@ public class TransactionService {
     /** 여러 자치구의 최근 등록 실거래 (홈 피드용). 빈 목록이면 전체 기준. */
     public List<Item> recentByRegions(Collection<String> guNames, int limit) {
         if (guNames == null || guNames.isEmpty()) {
-            return recent(null, null, null, limit).items();
+            return recent(null, null, null, null, null, null, limit).items();
         }
         String literal = "{" + String.join(",", guNames) + "}";
         return jdbcClient.sql(SELECT_PREFIX
@@ -84,6 +113,10 @@ public class TransactionService {
     private Item mapItem(ResultSet rs, int rowNum) throws SQLException {
         long priceManwon = rs.getLong("price_manwon");
         boolean priceNull = rs.wasNull();
+        int buildYear = rs.getInt("build_year");
+        boolean buildYearNull = rs.wasNull();
+        long monthlyRent = rs.getLong("monthly_rent_manwon");
+        boolean monthlyRentNull = rs.wasNull();
         return new Item(
                 rs.getLong("id"),
                 rs.getString("gu_name"),
@@ -97,7 +130,14 @@ public class TransactionService {
                 rs.getObject("contract_date", LocalDate.class),
                 rs.getString("contract_month"),
                 rs.getObject("first_seen_at", OffsetDateTime.class),
-                rs.getString("source_name"));
+                rs.getString("source_name"),
+                buildYearNull ? null : buildYear,
+                rs.getObject("registered_at", LocalDate.class),
+                rs.getString("building_dong"),
+                rs.getString("dealing_type"),
+                rs.getString("jibun"),
+                rs.getBigDecimal("land_area_m2"),
+                monthlyRentNull ? null : monthlyRent);
     }
 
     private Region resolveBjd(String bjdCode) {

@@ -134,8 +134,9 @@ class MolitAdapter(BaseAdapter):
             for item in items:
                 try:
                     # 공통 필드 추출 (APT/연립/오피스텔 태그명 혼용)
-                    complex_name = (item.get("aptNm") or item.get("연립다세대")
-                                    or item.get("단지") or item.get("offiNm"))
+                    # 아파트=aptNm, 연립다세대=mhouseNm, 오피스텔=offiNm (국토부 태그 상이)
+                    complex_name = (item.get("aptNm") or item.get("mhouseNm")
+                                    or item.get("offiNm"))
                     dong_name    = item.get("umdNm") or item.get("법정동")
                     area_raw     = item.get("excluUseAr") or item.get("전용면적")
                     area_m2      = float(area_raw) if area_raw else None
@@ -149,13 +150,24 @@ class MolitAdapter(BaseAdapter):
                     rgst_date    = item.get("rgstDate") or item.get("등록일")
                     build_raw    = item.get("buildYear") or item.get("건축년도")
                     build_year   = int(build_raw) if build_raw and str(build_raw).strip().isdigit() else None
+                    # 상세 정보(소스별 제공 여부 상이 → 없으면 None)
+                    building_dong = _clean(item.get("aptDong"))          # 건물 동(아파트 매매)
+                    dealing_type  = _clean(item.get("dealingGbn"))       # 중개/직거래(매매)
+                    jibun         = _clean(item.get("jibun"))
+                    land_raw      = item.get("landAr")                   # 대지권면적(빌라 매매)
+                    land_area_m2  = float(land_raw) if land_raw and land_raw.strip() else None
 
-                    # 전월세는 거래금액 대신 보증금/월세 합산
+                    # 전월세는 거래금액 대신 보증금/월세. 가격엔 보증금, 월세액은 별도 보존.
+                    monthly_rent = None
                     if trade_type == "JEONSE" and price is None:
                         deposit  = _parse_price(item.get("deposit") or item.get("보증금액"))
                         monthly  = _parse_price(item.get("monthlyRent") or item.get("월세금액"))
                         price    = deposit  # 보증금을 가격으로 저장
-                        actual_trade_type = "MONTHLY" if monthly and monthly > 0 else "JEONSE"
+                        if monthly and monthly > 0:
+                            actual_trade_type = "MONTHLY"
+                            monthly_rent = monthly
+                        else:
+                            actual_trade_type = "JEONSE"
                     else:
                         actual_trade_type = trade_type
 
@@ -180,6 +192,11 @@ class MolitAdapter(BaseAdapter):
                             rgst_date_str = rgst_date,
                             emitter       = self.emit_event,
                             build_year    = build_year,
+                            building_dong = building_dong,
+                            dealing_type  = dealing_type,
+                            jibun         = jibun,
+                            land_area_m2  = land_area_m2,
+                            monthly_rent_manwon = monthly_rent,
                         )
                     if is_new:
                         new_count += 1
@@ -194,3 +211,11 @@ def _parse_price(val: str | None) -> int | None:
         return None
     cleaned = val.replace(",", "").strip()
     return int(cleaned) if cleaned.lstrip("-").isdigit() else None
+
+
+def _clean(val: str | None) -> str | None:
+    """공백 trim 후 빈 문자열이면 None (국토부는 빈 값을 ' '로 줌)."""
+    if not val:
+        return None
+    s = val.strip()
+    return s or None

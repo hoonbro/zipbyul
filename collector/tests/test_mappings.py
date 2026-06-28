@@ -2,6 +2,7 @@
 from datetime import date
 
 from jipbyul_collector.adapters.applyhome import (
+    _dong_from_addr,
     _gu_from_addr,
     _map_mdl_unit,
     _map_supply,
@@ -20,6 +21,15 @@ def test_gu_from_addr_extracts_seoul_district():
 def test_gu_from_addr_returns_none_for_non_seoul():
     assert _gu_from_addr("경기도 구리시 갈매동") is None
     assert _gu_from_addr("") is None
+
+
+def test_dong_from_addr_extracts_legal_dong():
+    assert _dong_from_addr("서울특별시 은평구 진관동 144") == "진관동"
+    assert _dong_from_addr("서울특별시 마포구 합정동 1") == "합정동"
+    # 어간이 '동'으로 끝나는 자치구(강동구·성동구)는 자치구가 아니라 법정동을 잡아야 한다.
+    assert _dong_from_addr("서울특별시 강동구 천호동 123") == "천호동"
+    assert _dong_from_addr("서울특별시 성동구 행당동 45") == "행당동"
+    assert _dong_from_addr(None) is None
 
 
 def test_applyhome_supply_mapping():

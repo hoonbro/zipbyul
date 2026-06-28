@@ -21,8 +21,11 @@ public class TransactionController {
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String dong,
             @RequestParam(required = false) String bjdCode,
+            @RequestParam(required = false) String tradeType,
+            @RequestParam(required = false) Double areaMin,
+            @RequestParam(required = false) Double areaMax,
             @RequestParam(defaultValue = "20") int limit) {
         int bounded = Math.min(Math.max(limit, 1), 100);
-        return service.recent(region, dong, bjdCode, bounded);
+        return service.recent(region, dong, bjdCode, tradeType, areaMin, areaMax, bounded);
     }
 }

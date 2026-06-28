@@ -44,6 +44,11 @@ def upsert_transaction(
     rgst_date_str: str | None,
     emitter,
     build_year: int | None = None,  # 연식(안전마진 신축 보정, V10)
+    building_dong: str | None = None,  # 건물 동(아파트 매매 aptDong)
+    dealing_type: str | None = None,   # 거래유형(중개/직거래, 매매만)
+    jibun: str | None = None,
+    land_area_m2: float | None = None,  # 대지권면적(빌라 매매 landAr)
+    monthly_rent_manwon: int | None = None,  # 월세액(월세만, price_manwon은 보증금)
 ) -> bool:
     """
     Returns True if INSERT (신규 등록 → TRANSACTION_NEW 발행).
@@ -68,19 +73,27 @@ def upsert_transaction(
         INSERT INTO real_estate_transactions
             (source_code, bjd_code, gu_name, dong_name, complex_name,
              trade_type, area_m2, floor, price_manwon,
-             contract_date, contract_month, registered_at, build_year, dedup_hash)
+             contract_date, contract_month, registered_at, build_year, dedup_hash,
+             building_dong, dealing_type, jibun, land_area_m2, monthly_rent_manwon)
         VALUES
             (%s, %s, %s, %s, %s,
              %s, %s, %s, %s,
+             %s, %s, %s, %s, %s,
              %s, %s, %s, %s, %s)
         ON CONFLICT (dedup_hash) DO UPDATE
-            SET build_year = EXCLUDED.build_year
+            SET build_year = EXCLUDED.build_year,
+                building_dong = EXCLUDED.building_dong,
+                dealing_type = EXCLUDED.dealing_type,
+                jibun = EXCLUDED.jibun,
+                land_area_m2 = EXCLUDED.land_area_m2,
+                monthly_rent_manwon = EXCLUDED.monthly_rent_manwon
         RETURNING id, (xmax = 0) AS is_insert
         """,
         (
             source_code, bjd_code, gu_name, dong_name, complex_name,
             trade_type, area_m2, floor, price_manwon,
             contract_date, contract_month_str, registered_at, build_year, dedup_hash,
+            building_dong, dealing_type, jibun, land_area_m2, monthly_rent_manwon,
         ),
     ).fetchone()
 

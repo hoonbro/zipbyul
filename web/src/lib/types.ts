@@ -33,6 +33,24 @@ export interface RegionSummaryItem {
   recentTransactionCount: number
 }
 
+export interface ComplexSearchItem {
+  complexNorm: string
+  displayName: string
+  guName: string
+  transactionCount: number
+  lastContractDate: string | null
+}
+
+export interface ComplexSummaryItem {
+  complexNorm: string
+  displayName: string
+  guName: string
+  recentTransactionCount: number
+  latestSalePriceManwon: number | null
+  latestSaleContractDate: string | null
+  openAnnouncementCount: number
+}
+
 export interface DeviceResponse {
   id: number
   deviceToken: string
@@ -70,6 +88,13 @@ export interface RecentTransaction {
   contractMonth: string | null
   firstSeenAt: string
   sourceName: string
+  buildYear: number | null
+  registeredAt: string | null
+  buildingDong: string | null
+  dealingType: string | null
+  jibun: string | null
+  landAreaM2: number | null
+  monthlyRentManwon: number | null
 }
 
 export interface FeedHome {

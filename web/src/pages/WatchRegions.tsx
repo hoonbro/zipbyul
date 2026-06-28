@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import Chip from '../components/Chip'
 import { SEOUL_GU } from '../lib/constants'
-import { usePreferences, useRegions, useSavePreferences, useWatchSummary } from '../lib/hooks'
+import {
+  useAddWatchComplex,
+  useComplexSearch,
+  usePreferences,
+  useRegions,
+  useRemoveWatchComplex,
+  useSavePreferences,
+  useWatchComplexes,
+  useWatchSummary,
+} from '../lib/hooks'
 import type { Preferences } from '../lib/types'
 
 export default function WatchRegions() {
@@ -10,7 +19,7 @@ export default function WatchRegions() {
 
   return (
     <div className="space-y-6">
-      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">관심지역</h1>
+      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">관심지역·단지</h1>
 
       <section>
         <h2 className="mb-3 text-base font-extrabold tracking-tight">요약</h2>
@@ -35,12 +44,124 @@ export default function WatchRegions() {
         </ul>
       </section>
 
+      <ComplexSection />
+
       {prefs.data ? (
         <RegionEditor prefs={prefs.data} />
       ) : (
         <p className="text-sm text-muted-2">설정 불러오는 중…</p>
       )}
     </div>
+  )
+}
+
+function formatEok(manwon: number | null): string {
+  if (manwon == null) return '—'
+  if (manwon < 10000) return `${manwon.toLocaleString()}만`
+  const eok = Math.floor(manwon / 10000)
+  const rest = manwon % 10000
+  return rest === 0 ? `${eok}억` : `${eok}억 ${rest.toLocaleString()}만`
+}
+
+function ComplexSection() {
+  const watched = useWatchComplexes()
+  const remove = useRemoveWatchComplex()
+  const [gu, setGu] = useState('')
+  const [query, setQuery] = useState('')
+  const search = useComplexSearch(gu || null, query)
+  const add = useAddWatchComplex()
+
+  const watchedKeys = new Set((watched.data ?? []).map((c) => `${c.guName}|${c.complexNorm}`))
+
+  return (
+    <section>
+      <h2 className="mb-3 text-base font-extrabold tracking-tight">관심단지</h2>
+
+      {watched.isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
+      {watched.data && watched.data.length === 0 && (
+        <p className="text-sm text-muted-2">선택한 관심단지가 없습니다. 아래에서 검색해 추가하세요.</p>
+      )}
+      <ul className="space-y-2.5">
+        {watched.data?.map((c) => (
+          <li key={`${c.guName}|${c.complexNorm}`} className="rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[15px] font-bold">{c.displayName}</div>
+                <div className="mt-0.5 text-[11px] text-muted-2">{c.guName}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => remove.mutate({ guName: c.guName, complexNorm: c.complexNorm })}
+                className="text-xs text-coral"
+              >
+                삭제
+              </button>
+            </div>
+            <div className="mt-3 flex gap-3.5">
+              <Stat v={c.recentTransactionCount} k="최근거래" color="#3df5c5" />
+              <div className="text-center">
+                <div className="font-mono text-[15px] font-bold text-[#5ba8ff]">{formatEok(c.latestSalePriceManwon)}</div>
+                <div className="mt-px text-[10px] text-muted-2">최근매매</div>
+              </div>
+              <Stat v={c.openAnnouncementCount} k="진행공고" color="#ffce5a" />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
+        <div className="mb-2.5 text-sm font-bold">단지 추가</div>
+        <div className="flex gap-2">
+          <select
+            value={gu}
+            onChange={(e) => setGu(e.target.value)}
+            className="rounded-[12px] border border-white/[0.08] bg-bg px-3 py-2.5 text-sm"
+          >
+            <option value="">자치구</option>
+            {SEOUL_GU.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="단지명 검색"
+            className="flex-1 rounded-[12px] border border-white/[0.08] bg-bg px-3 py-2.5 text-sm"
+          />
+        </div>
+
+        {gu && (
+          <div className="mt-3">
+            {search.isLoading && <p className="text-xs text-muted-2">검색 중…</p>}
+            {search.data && search.data.length === 0 && (
+              <p className="text-xs text-muted-2">검색 결과가 없습니다.</p>
+            )}
+            <ul className="space-y-1.5">
+              {search.data?.map((r) => {
+                const added = watchedKeys.has(`${r.guName}|${r.complexNorm}`)
+                return (
+                  <li key={r.complexNorm} className="flex items-center justify-between">
+                    <span className="text-sm">{r.displayName}</span>
+                    <button
+                      type="button"
+                      disabled={added || add.isPending}
+                      onClick={() =>
+                        add.mutate({ guName: r.guName, complexNorm: r.complexNorm, displayName: r.displayName })
+                      }
+                      className="rounded-full bg-mint px-3 py-1 text-xs font-bold text-mint-ink disabled:opacity-40"
+                    >
+                      {added ? '추가됨' : '추가'}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 

@@ -26,7 +26,8 @@ public class WatchService {
 
     public List<String> watchRegions(UUID anonymousId) {
         return jdbcClient.sql(
-                "SELECT DISTINCT gu_name FROM user_watch_regions WHERE anonymous_id = :id ORDER BY gu_name")
+                "SELECT gu_name FROM user_watch_regions WHERE anonymous_id = :id"
+                        + " GROUP BY gu_name ORDER BY min(sort_order), gu_name")
                 .param("id", anonymousId)
                 .query(String.class)
                 .list();

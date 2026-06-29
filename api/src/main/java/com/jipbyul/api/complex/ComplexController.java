@@ -2,6 +2,7 @@ package com.jipbyul.api.complex;
 
 import com.jipbyul.api.common.ApiException;
 import com.jipbyul.api.common.ErrorCode;
+import com.jipbyul.api.complex.dto.ComplexDetail;
 import com.jipbyul.api.complex.dto.ComplexSearchItem;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,5 +28,15 @@ public class ComplexController {
             throw new ApiException(ErrorCode.INVALID_REGION, "자치구(gu)가 필요합니다.");
         }
         return service.search(gu, q);
+    }
+
+    @GetMapping("/detail")
+    public ComplexDetail detail(
+            @RequestParam String gu,
+            @RequestParam String norm) {
+        if (gu == null || gu.isBlank() || norm == null || norm.isBlank()) {
+            throw new ApiException(ErrorCode.INVALID_REGION, "자치구(gu)와 단지(norm)가 필요합니다.");
+        }
+        return service.detail(gu, norm);
     }
 }

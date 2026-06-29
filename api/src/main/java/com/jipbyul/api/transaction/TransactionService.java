@@ -10,9 +10,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.core.simple.JdbcClient.StatementSpec;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -40,11 +41,11 @@ public class TransactionService {
     private static final java.util.Set<String> TRADE_TYPES =
             java.util.Set.of("SALE", "JEONSE", "MONTHLY", "PRESALE");
 
-    public RecentTransactionsResponse recent(
-            String region, String dong, String bjdCode, String tradeType,
-            Double areaMin, Double areaMax, int limit) {
-        if (bjdCode != null && !bjdCode.isBlank()) {
-            Region resolved = resolveBjd(bjdCode);
+    public RecentTransactionsResponse recent(TransactionFilter f, int limit) {
+        String region = f.region();
+        String dong = f.dong();
+        if (f.bjdCode() != null && !f.bjdCode().isBlank()) {
+            Region resolved = resolveBjd(f.bjdCode());
             region = resolved.guName();
             if (resolved.dongName() != null) {
                 dong = resolved.dongName();   // 동 레벨 코드면 동까지 좁힘
@@ -54,52 +55,87 @@ public class TransactionService {
         }
 
         StringBuilder sql = new StringBuilder(SELECT_PREFIX).append(" WHERE 1 = 1");
+        Map<String, Object> params = new HashMap<>();
+        params.put("limit", limit);
+
         if (region != null && !region.isBlank()) {
             sql.append(" AND t.gu_name = :region");
+            params.put("region", region);
         }
         if (dong != null && !dong.isBlank()) {
             sql.append(" AND t.dong_name = :dong");
+            params.put("dong", dong);
         }
-        boolean filterTradeType = tradeType != null && !tradeType.isBlank();
-        if (filterTradeType) {
-            if (!TRADE_TYPES.contains(tradeType)) {
-                throw new ApiException(ErrorCode.INVALID_ENUM, "지원하지 않는 거래유형입니다: " + tradeType);
+        if (f.tradeType() != null && !f.tradeType().isBlank()) {
+            if (!TRADE_TYPES.contains(f.tradeType())) {
+                throw new ApiException(ErrorCode.INVALID_ENUM, "지원하지 않는 거래유형입니다: " + f.tradeType());
             }
             sql.append(" AND t.trade_type = :tradeType");
+            params.put("tradeType", f.tradeType());
         }
-        if (areaMin != null) {
+        if (f.areaMin() != null) {
             sql.append(" AND t.area_m2 >= :areaMin");
+            params.put("areaMin", f.areaMin());
         }
-        if (areaMax != null) {
+        if (f.areaMax() != null) {
             sql.append(" AND t.area_m2 < :areaMax");
+            params.put("areaMax", f.areaMax());
+        }
+        if (f.priceMin() != null) {
+            sql.append(" AND t.price_manwon >= :priceMin");
+            params.put("priceMin", f.priceMin());
+        }
+        if (f.priceMax() != null) {
+            sql.append(" AND t.price_manwon <= :priceMax");
+            params.put("priceMax", f.priceMax());
+        }
+        if (f.floorMin() != null) {
+            sql.append(" AND t.floor >= :floorMin");
+            params.put("floorMin", f.floorMin());
+        }
+        if (f.floorMax() != null) {
+            sql.append(" AND t.floor <= :floorMax");
+            params.put("floorMax", f.floorMax());
+        }
+        if (f.buildYearMin() != null) {
+            sql.append(" AND t.build_year >= :buildYearMin");
+            params.put("buildYearMin", f.buildYearMin());
+        }
+        if (f.buildYearMax() != null) {
+            sql.append(" AND t.build_year <= :buildYearMax");
+            params.put("buildYearMax", f.buildYearMax());
+        }
+        if (f.contractFrom() != null) {
+            sql.append(" AND t.contract_date >= :contractFrom");
+            params.put("contractFrom", f.contractFrom());
+        }
+        if (f.contractTo() != null) {
+            sql.append(" AND t.contract_date <= :contractTo");
+            params.put("contractTo", f.contractTo());
         }
         sql.append(" ORDER BY t.first_seen_at DESC LIMIT :limit");
 
-        StatementSpec spec = jdbcClient.sql(sql.toString()).param("limit", limit);
-        if (region != null && !region.isBlank()) {
-            spec = spec.param("region", region);
-        }
-        if (dong != null && !dong.isBlank()) {
-            spec = spec.param("dong", dong);
-        }
-        if (filterTradeType) {
-            spec = spec.param("tradeType", tradeType);
-        }
-        if (areaMin != null) {
-            spec = spec.param("areaMin", areaMin);
-        }
-        if (areaMax != null) {
-            spec = spec.param("areaMax", areaMax);
-        }
-
-        List<Item> items = spec.query(this::mapItem).list();
+        List<Item> items = jdbcClient.sql(sql.toString()).params(params).query(this::mapItem).list();
         return new RecentTransactionsResponse(items, NOTICE);
+    }
+
+    /** 특정 단지(complex_norm)의 최근 거래. complex_norm 규칙은 V10 인덱스와 동일. */
+    public List<Item> recentByComplex(String guName, String complexNorm, int limit) {
+        return jdbcClient.sql(SELECT_PREFIX
+                + " WHERE t.gu_name = :gu"
+                + " AND regexp_replace(t.complex_name, '[[:space:]()0-9차]', '', 'g') = :norm"
+                + " ORDER BY t.first_seen_at DESC LIMIT :limit")
+                .param("gu", guName)
+                .param("norm", complexNorm)
+                .param("limit", limit)
+                .query(this::mapItem)
+                .list();
     }
 
     /** 여러 자치구의 최근 등록 실거래 (홈 피드용). 빈 목록이면 전체 기준. */
     public List<Item> recentByRegions(Collection<String> guNames, int limit) {
         if (guNames == null || guNames.isEmpty()) {
-            return recent(null, null, null, null, null, null, limit).items();
+            return recent(TransactionFilter.empty(), limit).items();
         }
         String literal = "{" + String.join(",", guNames) + "}";
         return jdbcClient.sql(SELECT_PREFIX

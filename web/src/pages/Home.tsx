@@ -6,6 +6,7 @@ import StarRating from '../components/StarRating'
 import { eventTag } from '../lib/colors'
 import { TRADE_TYPE_LABELS } from '../lib/constants'
 import { useFeedHome, useNotifications } from '../lib/hooks'
+import type { FeedHome } from '../lib/types'
 
 const NOTIF_SEEN_KEY = 'jb_notif_last_seen'
 
@@ -207,25 +208,7 @@ export default function Home() {
       {/* 내 관심지역 */}
       <section>
         <SectionHead title="내 관심지역" to="/watch" linkLabel="편집" />
-        {data.regionSummary.length === 0 ? (
-          <p className="text-xs text-muted-2">선택한 관심지역이 없습니다.</p>
-        ) : (
-          <ul className="space-y-2.5">
-            {data.regionSummary.map((r) => (
-              <li key={r.regionName} className="flex items-center justify-between rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-[7px] w-[7px] rounded-full bg-mint" style={{ boxShadow: '0 0 7px #3df5c5' }} />
-                  <span className="text-[15px] font-bold">{r.regionName}</span>
-                </div>
-                <div className="flex gap-3.5">
-                  <Stat v={r.announcementCount} k="공고" color="#5ba8ff" />
-                  <Stat v={r.deadlineCount} k="마감임박" color="#ffce5a" />
-                  <Stat v={r.recentTransactionCount} k="실거래" color="#3df5c5" />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <MyRegions regions={data.regionSummary} />
       </section>
 
       {/* 실거래 신규 등록 */}
@@ -278,6 +261,44 @@ export default function Home() {
         ))}
       </section>
     </div>
+  )
+}
+
+const REGION_PREVIEW = 5
+
+function MyRegions({ regions }: { regions: FeedHome['regionSummary'] }) {
+  const [showAll, setShowAll] = useState(false)
+  if (regions.length === 0) {
+    return <p className="text-xs text-muted-2">선택한 관심지역이 없습니다.</p>
+  }
+  const visible = showAll ? regions : regions.slice(0, REGION_PREVIEW)
+  return (
+    <>
+      <ul className="space-y-2.5">
+        {visible.map((r) => (
+          <li key={r.regionName} className="flex items-center justify-between rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="h-[7px] w-[7px] rounded-full bg-mint" style={{ boxShadow: '0 0 7px #3df5c5' }} />
+              <span className="text-[15px] font-bold">{r.regionName}</span>
+            </div>
+            <div className="flex gap-3.5">
+              <Stat v={r.announcementCount} k="공고" color="#5ba8ff" />
+              <Stat v={r.deadlineCount} k="마감임박" color="#ffce5a" />
+              <Stat v={r.recentTransactionCount} k="실거래" color="#3df5c5" />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {regions.length > REGION_PREVIEW && (
+        <button
+          type="button"
+          onClick={() => setShowAll((s) => !s)}
+          className="mt-2.5 w-full rounded-[12px] border border-white/[0.08] py-2.5 text-xs font-bold text-muted-2"
+        >
+          {showAll ? '접기 ▴' : `전체 ${regions.length}개 보기 ▾`}
+        </button>
+      )}
+    </>
   )
 }
 

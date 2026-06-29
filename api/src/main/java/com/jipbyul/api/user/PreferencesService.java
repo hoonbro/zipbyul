@@ -78,7 +78,7 @@ public class PreferencesService {
 
     private PreferencesResponse load(UUID anonymousId) {
         List<WatchRegionDto> regions = jdbcClient.sql(
-                        "SELECT gu_name, bjd_code FROM user_watch_regions WHERE anonymous_id = :id ORDER BY id")
+                        "SELECT gu_name, bjd_code FROM user_watch_regions WHERE anonymous_id = :id ORDER BY sort_order, id")
                 .param("id", anonymousId)
                 .query((rs, n) -> new WatchRegionDto(rs.getString("gu_name"), rs.getString("bjd_code")))
                 .list();
@@ -114,12 +114,15 @@ public class PreferencesService {
                 .param("id", anonymousId)
                 .update();
         Set<WatchRegionDto> unique = new LinkedHashSet<>(regions);
+        int order = 0;
         for (WatchRegionDto region : unique) {
             jdbcClient.sql(
-                    "INSERT INTO user_watch_regions (anonymous_id, gu_name, bjd_code) VALUES (:id, :gu, :bjd)")
+                    "INSERT INTO user_watch_regions (anonymous_id, gu_name, bjd_code, sort_order)"
+                            + " VALUES (:id, :gu, :bjd, :order)")
                     .param("id", anonymousId)
                     .param("gu", region.guName())
                     .param("bjd", blankToNull(region.bjdCode()))
+                    .param("order", order++)
                     .update();
         }
     }

@@ -1,4 +1,15 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import Chip from '../components/Chip'
 import { SEOUL_GU } from '../lib/constants'
 import {
@@ -14,21 +25,60 @@ import {
 import type { Preferences } from '../lib/types'
 
 export default function WatchRegions() {
+  const [tab, setTab] = useState<'region' | 'complex'>('region')
+
+  return (
+    <div className="space-y-5">
+      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">관심지역·단지</h1>
+
+      <div className="flex rounded-[14px] border border-white/[0.08] bg-surface p-1">
+        <TabButton active={tab === 'region'} onClick={() => setTab('region')}>
+          지역
+        </TabButton>
+        <TabButton active={tab === 'complex'} onClick={() => setTab('complex')}>
+          단지
+        </TabButton>
+      </div>
+
+      {tab === 'region' ? <RegionTab /> : <ComplexSection />}
+    </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-[11px] py-2.5 text-sm font-bold transition-colors ${
+        active ? 'bg-mint text-mint-ink' : 'text-muted-2'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+const SUMMARY_PREVIEW = 6
+
+function RegionTab() {
   const summary = useWatchSummary()
   const prefs = usePreferences()
+  const [showAll, setShowAll] = useState(false)
+
+  const items = summary.data ?? []
+  const visible = showAll ? items : items.slice(0, SUMMARY_PREVIEW)
 
   return (
     <div className="space-y-6">
-      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">관심지역·단지</h1>
-
       <section>
         <h2 className="mb-3 text-base font-extrabold tracking-tight">요약</h2>
         {summary.isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
-        {summary.data && summary.data.length === 0 && (
+        {summary.data && items.length === 0 && (
           <p className="text-sm text-muted-2">선택한 관심지역이 없습니다.</p>
         )}
         <ul className="space-y-2.5">
-          {summary.data?.map((r) => (
+          {visible.map((r) => (
             <li key={r.regionName} className="flex items-center justify-between rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
               <div className="flex items-center gap-2.5">
                 <span className="h-[7px] w-[7px] rounded-full bg-mint" style={{ boxShadow: '0 0 7px #3df5c5' }} />
@@ -42,9 +92,16 @@ export default function WatchRegions() {
             </li>
           ))}
         </ul>
+        {items.length > SUMMARY_PREVIEW && (
+          <button
+            type="button"
+            onClick={() => setShowAll((s) => !s)}
+            className="mt-2.5 w-full rounded-[12px] border border-white/[0.08] py-2.5 text-xs font-bold text-muted-2"
+          >
+            {showAll ? '접기 ▴' : `전체 ${items.length}개 보기 ▾`}
+          </button>
+        )}
       </section>
-
-      <ComplexSection />
 
       {prefs.data ? (
         <RegionEditor prefs={prefs.data} />
@@ -64,6 +121,7 @@ function formatEok(manwon: number | null): string {
 }
 
 function ComplexSection() {
+  const navigate = useNavigate()
   const watched = useWatchComplexes()
   const remove = useRemoveWatchComplex()
   const [gu, setGu] = useState('')
@@ -85,10 +143,18 @@ function ComplexSection() {
         {watched.data?.map((c) => (
           <li key={`${c.guName}|${c.complexNorm}`} className="rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
             <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[15px] font-bold">{c.displayName}</div>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/complex?gu=${encodeURIComponent(c.guName)}&norm=${encodeURIComponent(c.complexNorm)}&name=${encodeURIComponent(c.displayName)}`,
+                  )
+                }
+                className="text-left"
+              >
+                <div className="text-[15px] font-bold">{c.displayName} ›</div>
                 <div className="mt-0.5 text-[11px] text-muted-2">{c.guName}</div>
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={() => remove.mutate({ guName: c.guName, complexNorm: c.complexNorm })}
@@ -189,8 +255,19 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
     return init
   })
 
+  const allSelected = selected.length === SEOUL_GU.length
+  const toggleAll = () => setSelected(allSelected ? [] : [...SEOUL_GU])
+
   const toggle = (gu: string) =>
     setSelected((s) => (s.includes(gu) ? s.filter((v) => v !== gu) : [...s, gu]))
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (over && active.id !== over.id) {
+      setSelected((s) => arrayMove(s, s.indexOf(active.id as string), s.indexOf(over.id as string)))
+    }
+  }
 
   const toggleDong = (gu: string, bjdCode: string) =>
     setDongsByGu((m) => {
@@ -218,7 +295,12 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-base font-extrabold tracking-tight">지역 편집 (자치구)</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-base font-extrabold tracking-tight">지역 편집 (자치구)</h2>
+        <button type="button" onClick={toggleAll} className="text-xs font-bold text-mint">
+          {allSelected ? '전체 해제' : '전체 선택'}
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2.5">
         {SEOUL_GU.map((gu) => (
           <Chip key={gu} selected={selected.includes(gu)} onClick={() => toggle(gu)}>
@@ -228,16 +310,23 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
       </div>
 
       {selected.length > 0 && (
-        <div className="mt-5 space-y-4">
-          <p className="text-xs text-muted-2">동 단위로 실거래를 좁히려면 선택하세요 (선택 안 하면 자치구 전체).</p>
-          {selected.map((gu) => (
-            <DongNarrowing
-              key={gu}
-              gu={gu}
-              selected={dongsByGu[gu] ?? []}
-              onToggle={(bjd) => toggleDong(gu, bjd)}
-            />
-          ))}
+        <div className="mt-5 space-y-2.5">
+          <p className="text-xs text-muted-2">≡ 를 끌어 우선순위를 바꾸고, 자치구를 펼쳐 동을 선택하세요 (선택 안 하면 자치구 전체).</p>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={selected} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2.5">
+                {selected.map((gu, i) => (
+                  <DongNarrowing
+                    key={gu}
+                    gu={gu}
+                    rank={i + 1}
+                    selected={dongsByGu[gu] ?? []}
+                    onToggle={(bjd) => toggleDong(gu, bjd)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 
@@ -257,26 +346,68 @@ function RegionEditor({ prefs }: { prefs: Preferences }) {
 
 function DongNarrowing({
   gu,
+  rank,
   selected,
   onToggle,
 }: {
   gu: string
+  rank: number
   selected: string[]
   onToggle: (bjdCode: string) => void
 }) {
-  const regions = useRegions(gu)
+  const [open, setOpen] = useState(false)
+  const regions = useRegions(open ? gu : null) // 펼칠 때만 동 목록 로드
+  const label = selected.length === 0 ? '동 전체' : `${selected.length}개 선택`
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: gu })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  }
 
   return (
-    <div className="rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
-      <div className="mb-2.5 text-sm font-bold">{gu}</div>
-      {regions.isLoading && <p className="text-xs text-muted-2">동 목록 불러오는 중…</p>}
-      {regions.data && (
-        <div className="flex flex-wrap gap-2">
-          {regions.data.map((r) => (
-            <Chip key={r.bjdCode} selected={selected.includes(r.bjdCode)} onClick={() => onToggle(r.bjdCode)}>
-              {r.dongName}
-            </Chip>
-          ))}
+    <div ref={setNodeRef} style={style} className="rounded-[15px] border border-white/[0.06] bg-surface">
+      <div className="flex items-center">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label="드래그로 우선순위 변경"
+          className="cursor-grab touch-none px-3 py-3.5 text-base text-muted-2"
+        >
+          ≡
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex flex-1 items-center justify-between py-3.5 pr-4"
+        >
+          <span className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-mint/15 font-mono text-[11px] font-bold text-mint">
+              {rank}
+            </span>
+            <span className="text-sm font-bold">{gu}</span>
+          </span>
+          <span className="flex items-center gap-2 text-xs text-muted-2">
+            {label}
+            <span>{open ? '▴' : '▾'}</span>
+          </span>
+        </button>
+      </div>
+      {open && (
+        <div className="border-t border-white/[0.06] px-4 py-3.5">
+          {regions.isLoading && <p className="text-xs text-muted-2">동 목록 불러오는 중…</p>}
+          {regions.data && (
+            <div className="flex flex-wrap gap-2">
+              {regions.data.map((r) => (
+                <Chip key={r.bjdCode} selected={selected.includes(r.bjdCode)} onClick={() => onToggle(r.bjdCode)}>
+                  {r.dongName}
+                </Chip>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

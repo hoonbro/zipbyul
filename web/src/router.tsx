@@ -14,8 +14,9 @@ import WatchRegions from './pages/WatchRegions'
 import Transactions from './pages/Transactions'
 import NotificationSettings from './pages/NotificationSettings'
 
-// recharts가 무거워 집값전망만 코드스플릿
+// recharts가 무거워 차트 페이지는 코드스플릿
 const MarketOutlook = lazy(() => import('./pages/MarketOutlook'))
+const ComplexDetail = lazy(() => import('./pages/ComplexDetail'))
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
           { path: 'announcements/:id', element: <AnnouncementDetail /> },
           { path: 'watch', element: <WatchRegions /> },
           { path: 'transactions', element: <Transactions /> },
+          { path: 'complex', element: <ComplexDetail /> },
           { path: 'settings', element: <NotificationSettings /> },
         ],
       },

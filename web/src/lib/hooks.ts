@@ -4,6 +4,7 @@ import type {
   AnnouncementDetail,
   AnnouncementList,
   CalendarItem,
+  ComplexDetail,
   ComplexSearchItem,
   ComplexSummaryItem,
   FeedHome,
@@ -144,6 +145,17 @@ export function useComplexSearch(gu: string | null, q: string) {
   })
 }
 
+export function useComplexDetail(gu: string | null, norm: string | null) {
+  return useQuery({
+    queryKey: ['complex-detail', gu, norm],
+    enabled: !!gu && !!norm,
+    queryFn: () => {
+      const qs = new URLSearchParams({ gu: gu!, norm: norm! })
+      return apiFetch<ComplexDetail>(`/v1/complexes/detail?${qs.toString()}`)
+    },
+  })
+}
+
 export function useAddWatchComplex() {
   const qc = useQueryClient()
   return useMutation({
@@ -182,6 +194,14 @@ export interface RecentTransactionParams {
   tradeType?: string
   areaMin?: number
   areaMax?: number
+  priceMin?: number
+  priceMax?: number
+  floorMin?: number
+  floorMax?: number
+  buildYearMin?: number
+  buildYearMax?: number
+  contractFrom?: string
+  contractTo?: string
 }
 
 export function useRecentTransactions(params: RecentTransactionParams) {
@@ -192,6 +212,14 @@ export function useRecentTransactions(params: RecentTransactionParams) {
   if (params.tradeType) qs.set('tradeType', params.tradeType)
   if (params.areaMin != null) qs.set('areaMin', String(params.areaMin))
   if (params.areaMax != null) qs.set('areaMax', String(params.areaMax))
+  if (params.priceMin != null) qs.set('priceMin', String(params.priceMin))
+  if (params.priceMax != null) qs.set('priceMax', String(params.priceMax))
+  if (params.floorMin != null) qs.set('floorMin', String(params.floorMin))
+  if (params.floorMax != null) qs.set('floorMax', String(params.floorMax))
+  if (params.buildYearMin != null) qs.set('buildYearMin', String(params.buildYearMin))
+  if (params.buildYearMax != null) qs.set('buildYearMax', String(params.buildYearMax))
+  if (params.contractFrom) qs.set('contractFrom', params.contractFrom)
+  if (params.contractTo) qs.set('contractTo', params.contractTo)
   const query = qs.toString()
   return useQuery({
     queryKey: ['transactions', 'recent', params],

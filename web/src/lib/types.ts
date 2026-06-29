@@ -41,6 +41,33 @@ export interface ComplexSearchItem {
   lastContractDate: string | null
 }
 
+export interface ComplexTrendPoint {
+  areaBand: string
+  month: string
+  medianManwon: number
+  count: number
+}
+
+export interface ComplexBandSummary {
+  areaBand: string
+  saleMedianManwon: number | null
+  jeonseMedianManwon: number | null
+  jeonseRatio: number | null
+  gapManwon: number | null
+  saleCount: number
+  jeonseCount: number
+}
+
+export interface ComplexDetail {
+  complexNorm: string
+  displayName: string
+  guName: string
+  buildYear: number | null
+  saleTrend: ComplexTrendPoint[]
+  bandSummary: ComplexBandSummary[]
+  recentTransactions: RecentTransaction[]
+}
+
 export interface ComplexSummaryItem {
   complexNorm: string
   displayName: string

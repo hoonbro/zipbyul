@@ -1,6 +1,8 @@
 package com.jipbyul.api.transaction;
 
 import com.jipbyul.api.transaction.dto.RecentTransactionsResponse;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,8 +26,19 @@ public class TransactionController {
             @RequestParam(required = false) String tradeType,
             @RequestParam(required = false) Double areaMin,
             @RequestParam(required = false) Double areaMax,
+            @RequestParam(required = false) Long priceMin,
+            @RequestParam(required = false) Long priceMax,
+            @RequestParam(required = false) Integer floorMin,
+            @RequestParam(required = false) Integer floorMax,
+            @RequestParam(required = false) Integer buildYearMin,
+            @RequestParam(required = false) Integer buildYearMax,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate contractFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate contractTo,
             @RequestParam(defaultValue = "20") int limit) {
         int bounded = Math.min(Math.max(limit, 1), 100);
-        return service.recent(region, dong, bjdCode, tradeType, areaMin, areaMax, bounded);
+        var filter = new TransactionFilter(region, dong, bjdCode, tradeType, areaMin, areaMax,
+                priceMin, priceMax, floorMin, floorMax, buildYearMin, buildYearMax,
+                contractFrom, contractTo);
+        return service.recent(filter, bounded);
     }
 }

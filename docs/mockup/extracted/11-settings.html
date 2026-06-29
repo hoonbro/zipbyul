@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080b12" />
+  <title>집별 · 알림 설정</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+@theme {
+  --color-bg: #080b12;
+  --color-surface: #0f1623;
+  --color-surface-2: #11192a;
+  --color-soon: #0e1320;
+  --color-mint: #3df5c5;
+  --color-mint-ink: #06281f;
+  --color-amber: #ffce5a;
+  --color-coral: #ff7b88;
+  --color-red: #ff5c6c;
+  --color-sky: #5ba8ff;
+  --color-violet: #9aa7ff;
+  --color-ink: #eaf0f7;
+  --color-ink-2: #cdd7e4;
+  --color-muted: #8a97ab;
+  --color-muted-2: #5a6678;
+  --font-sans: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+  </style>
+  <style>
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #080b12;
+  color: #eaf0f7;
+  font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 0; height: 0; }
+@keyframes jb-sweep { to { transform: rotate(360deg); } }
+@keyframes jb-blip { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes jb-ping { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes jb-slidein { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes jb-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"><div class="mx-auto flex h-full max-w-[430px] flex-col bg-bg"><main class="flex-1 overflow-y-auto px-[18px] pt-[calc(env(safe-area-inset-top)_+_8px)] pb-[4.75rem]"><div class="space-y-6"><h1 class="mt-1.5 text-[21px] font-extrabold tracking-tight">알림 설정</h1><section class="rounded-[15px] border border-white/[0.06] bg-surface p-4"><h2 class="mb-1.5 text-sm font-bold text-ink-2">푸시 알림</h2><p class="text-xs text-coral">알림 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.</p></section><section><h2 class="mb-3 text-base font-extrabold tracking-tight">알림 강도</h2><div class="flex flex-col gap-2.5"><button type="button" class="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3.5 text-left border-white/[0.07] bg-surface"><span class="flex flex-col gap-0.5"><span class="text-[15px] font-bold">모든 알림</span><span class="text-[13px] text-muted">관심지역·유형 매칭 전체 즉시</span></span><span class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#3a4456]"></span></button><button type="button" class="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3.5 text-left border-mint/45 bg-mint/[0.08]"><span class="flex flex-col gap-0.5"><span class="text-[15px] font-bold">중요 알림만</span><span class="text-[13px] text-muted">별 3개 이상만 즉시</span></span><span class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-mint"><span class="h-[11px] w-[11px] rounded-full bg-mint"></span></span></button><button type="button" class="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3.5 text-left border-white/[0.07] bg-surface"><span class="flex flex-col gap-0.5"><span class="text-[15px] font-bold">마감 임박만</span><span class="text-[13px] text-muted">D-3·D-1·당일 마감</span></span><span class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#3a4456]"></span></button><button type="button" class="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3.5 text-left border-white/[0.07] bg-surface"><span class="flex flex-col gap-0.5"><span class="text-[15px] font-bold">관심지역만</span><span class="text-[13px] text-muted">관심지역 매칭 위주</span></span><span class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#3a4456]"></span></button><button type="button" class="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3.5 text-left border-white/[0.07] bg-surface"><span class="flex flex-col gap-0.5"><span class="text-[15px] font-bold">하루 요약만</span><span class="text-[13px] text-muted">즉시 없이 하루 1회</span></span><span class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#3a4456]"></span></button></div></section><section><h2 class="mb-3 text-base font-extrabold tracking-tight">관심 유형</h2><div class="flex flex-wrap gap-2.5"><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">민간청약</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">무순위 청약</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">행복주택</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">매입임대</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">정책·금리</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">실거래 등록</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">집값 전망 심리</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">청년안심주택</button><button type="button" class="rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-mint/55 bg-mint/15 text-mint">장기전세</button></div></section><section class="space-y-3.5 rounded-[15px] border border-white/[0.06] bg-surface p-4"><label class="flex items-center justify-between text-sm"><span class="text-ink-2">실거래 즉시 알림</span><input class="accent-mint" type="checkbox"></label><label class="flex items-center justify-between text-sm"><span class="text-ink-2">하루 요약</span><input class="accent-mint" type="checkbox" checked=""></label><label class="flex items-center justify-between text-sm"><span class="text-muted">요약 시각</span><input class="rounded-lg border border-white/10 bg-surface-2 px-2 py-1 text-ink [color-scheme:dark]" type="time" value="08:00"></label><div class="flex items-center justify-between text-sm"><span class="text-ink-2">방해 금지</span><span class="flex items-center gap-1.5"><input class="rounded-lg border border-white/10 bg-surface-2 px-2 py-1 text-ink [color-scheme:dark]" type="time" value=""><span class="text-muted-2">~</span><input class="rounded-lg border border-white/10 bg-surface-2 px-2 py-1 text-ink [color-scheme:dark]" type="time" value=""></span></div></section><button type="button" class="w-full rounded-[14px] bg-mint py-3.5 text-sm font-bold text-mint-ink disabled:opacity-40">저장</button><section><h2 class="mb-3 text-base font-extrabold tracking-tight">알림함</h2><p class="text-sm text-muted-2">받은 알림이 없습니다.</p><ul class="space-y-2"></ul></section><section class="border-t border-white/[0.06] pt-5"><button type="button" class="text-sm text-coral underline disabled:opacity-50">내 데이터 삭제</button><p class="mt-1.5 text-[11px] text-muted-2">localStorage 식별자가 삭제되며 복구할 수 없습니다.</p></section></div></main><nav class="fixed bottom-0 left-1/2 flex h-[68px] w-full max-w-[430px] -translate-x-1/2 border-t border-white/[0.07] bg-bg/90 pb-3 backdrop-blur-md"><a class="flex flex-1 flex-col items-center justify-center gap-1 text-muted-2" href="/" data-discover="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"></circle><circle cx="12" cy="12" r="8" opacity="0.55"></circle><path d="M12 12l5.6-5.6"></path></svg><span class="text-[10px] font-semibold">레이더</span></a><a class="flex flex-1 flex-col items-center justify-center gap-1 text-muted-2" href="/calendar" data-discover="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="16" rx="3"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg><span class="text-[10px] font-semibold">캘린더</span></a><a class="flex flex-1 flex-col items-center justify-center gap-1 text-muted-2" href="/news" data-discover="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2.5"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg><span class="text-[10px] font-semibold">뉴스</span></a><a class="flex flex-1 flex-col items-center justify-center gap-1 text-muted-2" href="/market-outlook" data-discover="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 14a8 8 0 0 1 16 0"></path><path d="M12 14l4-3.5"></path><circle cx="12" cy="14" r="1.6" fill="currentColor" stroke="none"></circle></svg><span class="text-[10px] font-semibold">지수</span></a><a aria-current="page" class="flex flex-1 flex-col items-center justify-center gap-1 text-mint" href="/settings" data-discover="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg><span class="text-[10px] font-semibold">설정</span></a></nav></div></div>
+</body>
+</html>

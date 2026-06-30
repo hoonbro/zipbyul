@@ -7,6 +7,7 @@ import com.jipbyul.api.announcement.dto.AnnouncementListResponse;
 import com.jipbyul.api.announcement.dto.AnnouncementSummary;
 import com.jipbyul.api.common.ApiException;
 import com.jipbyul.api.common.ErrorCode;
+import com.jipbyul.api.common.Times;
 import com.jipbyul.api.margin.SafetyMarginService;
 import com.jipbyul.api.margin.dto.AnnouncementMargin;
 import java.time.LocalDate;
@@ -31,17 +32,18 @@ public class AnnouncementService {
         this.marginService = marginService;
     }
 
-    public AnnouncementListResponse list(String region, String supplyType, int page, int size) {
+    public AnnouncementListResponse list(String region, String supplyType, boolean openOnly, int page, int size) {
         if (region != null && !region.isBlank()) {
             requireRegion(region);
         }
         String filter = " WHERE 1 = 1"
                 + (region != null && !region.isBlank() ? " AND ha.gu_name = :region" : "")
-                + (supplyType != null && !supplyType.isBlank() ? " AND ha.supply_type = :supplyType" : "");
+                + (supplyType != null && !supplyType.isBlank() ? " AND ha.supply_type = :supplyType" : "")
+                + (openOnly ? " AND ha.apply_end >= :today" : "");
 
         StatementSpec countSpec = bindFilters(
                 jdbcClient.sql("SELECT count(*) FROM housing_announcements ha" + filter),
-                region, supplyType);
+                region, supplyType, openOnly);
         long total = countSpec.query(Long.class).single();
 
         StatementSpec listSpec = bindFilters(jdbcClient.sql("""
@@ -53,7 +55,7 @@ public class AnnouncementService {
                 """ + filter + """
                  ORDER BY ha.apply_end DESC NULLS LAST, ha.id DESC
                  LIMIT :size OFFSET :offset
-                """), region, supplyType)
+                """), region, supplyType, openOnly)
                 .param("size", size)
                 .param("offset", (long) page * size);
 
@@ -105,12 +107,15 @@ public class AnnouncementService {
                 .orElseThrow(() -> new ApiException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
     }
 
-    private StatementSpec bindFilters(StatementSpec spec, String region, String supplyType) {
+    private StatementSpec bindFilters(StatementSpec spec, String region, String supplyType, boolean openOnly) {
         if (region != null && !region.isBlank()) {
             spec = spec.param("region", region);
         }
         if (supplyType != null && !supplyType.isBlank()) {
             spec = spec.param("supplyType", supplyType);
+        }
+        if (openOnly) {
+            spec = spec.param("today", Times.today());
         }
         return spec;
     }

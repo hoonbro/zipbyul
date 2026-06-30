@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import DDayBadge from '../components/DDayBadge'
 import { ddayLook, eventTag } from '../lib/colors'
 import { useCalendar } from '../lib/hooks'
@@ -9,7 +9,7 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 const GROUPS = ['전체', '청약', '공공임대', '정책·금리'] as const
 const GROUP_COLOR: Record<string, string> = { 청약: '#3df5c5', 공공임대: '#5ba8ff', '정책·금리': '#ffce5a' }
 
-const PERIODS = ['지난주', '어제', '오늘', '내일', '이번주', '다음주'] as const
+const PERIODS = ['7일내', '지난주', '어제', '오늘', '내일', '이번주', '다음주'] as const
 type Period = (typeof PERIODS)[number]
 const isWeekPeriod = (p: Period) => p === '지난주' || p === '이번주' || p === '다음주'
 
@@ -27,6 +27,8 @@ const DDAY_TO = toISO(addDays(WEEK_START, 13))
 
 function periodRange(p: Period): [string, string] {
   switch (p) {
+    case '7일내':
+      return [TODAY_ISO, toISO(addDays(TODAY, 7))]
     case '지난주':
       return [toISO(addDays(WEEK_START, -7)), toISO(addDays(WEEK_START, -1))]
     case '어제':
@@ -99,6 +101,15 @@ function buildDisplay(items: CalendarItem[]): DisplayEvent[] {
 const ddText = (n: number) => (n === 0 ? '오늘' : n > 0 ? `D-${n}` : `D+${-n}`)
 
 const chipCls = 'rounded-md bg-mint/15 px-1.5 py-0.5 text-[10px] font-bold text-mint'
+
+function initialView(param: string | null): 'month' | 'dday' {
+  return param === 'dday' ? 'dday' : 'month'
+}
+
+function initialPeriod(param: string | null): Period {
+  if (param === '7days') return '7일내'
+  return PERIODS.includes(param as Period) ? (param as Period) : '이번주'
+}
 
 // 안전마진 등급 배지 (A안: 태그 줄). 기획안 §5.
 const GRADE_BADGE: Record<string, { label: string; fg: string; bg: string }> = {
@@ -192,17 +203,20 @@ function EventCard({ c }: { c: DisplayEvent }) {
 }
 
 export default function Calendar() {
-  const [view, setView] = useState<'month' | 'dday'>('month')
+  const [searchParams] = useSearchParams()
+  const region = searchParams.get('region') || undefined
+  const eventType = searchParams.get('type') || undefined
+  const [view, setView] = useState<'month' | 'dday'>(() => initialView(searchParams.get('view')))
   const [y, setY] = useState(now.getFullYear())
   const [m, setM] = useState(now.getMonth() + 1)
   const [selDay, setSelDay] = useState(now.getDate())
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('전체')
-  const [period, setPeriod] = useState<Period>('이번주')
+  const [period, setPeriod] = useState<Period>(() => initialPeriod(searchParams.get('period')))
 
   const daysInMonth = new Date(y, m, 0).getDate()
   const from = view === 'month' ? `${y}-${pad(m)}-01` : DDAY_FROM
   const to = view === 'month' ? `${y}-${pad(m)}-${pad(daysInMonth)}` : DDAY_TO
-  const { data, isLoading, isError } = useCalendar({ from, to })
+  const { data, isLoading, isError } = useCalendar({ from, to, type: eventType, region })
 
   const filtered = buildDisplay(data ?? []).filter((it) => group === '전체' || itemGroup(it) === group)
 
@@ -261,6 +275,25 @@ export default function Calendar() {
           ))}
         </div>
       </div>
+
+      {/* group filters */}
+      {(region || eventType) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {region && (
+            <span className="rounded-full border border-mint/35 bg-mint/10 px-3 py-1.5 text-[12px] font-semibold text-mint">
+              {region}
+            </span>
+          )}
+          {eventType && (
+            <span className="rounded-full border border-amber/35 bg-amber/10 px-3 py-1.5 text-[12px] font-semibold text-amber">
+              {eventType === 'APPLICATION_DEADLINE' ? '접수 마감' : eventType}
+            </span>
+          )}
+          <Link to="/calendar" className="px-2 py-1 text-[12px] font-semibold text-muted-2 underline">
+            전체 보기
+          </Link>
+        </div>
+      )}
 
       {/* group filters */}
       <div className="flex gap-2 overflow-x-auto pb-0.5">

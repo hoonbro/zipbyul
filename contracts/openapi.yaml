@@ -415,6 +415,7 @@ paths:
       parameters:
         - { name: region, in: query, schema: { type: string } }
         - { name: supplyType, in: query, schema: { type: string } }
+        - { name: openOnly, in: query, schema: { type: boolean, default: false }, description: true면 접수마감일이 오늘 이후인 공고만 }
         - { name: page, in: query, schema: { type: integer, default: 0 } }
         - { name: size, in: query, schema: { type: integer, default: 20, maximum: 100 } }
       responses:
@@ -438,6 +439,7 @@ paths:
         - { name: region, in: query, schema: { type: string }, description: 자치구 }
         - { name: dong, in: query, schema: { type: string }, description: 법정동명 }
         - { name: bjdCode, in: query, schema: { type: string }, description: 법정동코드(있으면 region/dong 대신 해석) }
+        - { name: recentDays, in: query, schema: { type: integer, minimum: 1, maximum: 30 }, description: first_seen_at 기준 최근 N일 }
         - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecentTransactions' } } } }

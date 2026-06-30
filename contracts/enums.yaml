@@ -42,6 +42,7 @@ trade_type:       # 실거래
   - { code: SALE,    label: 매매 }
   - { code: JEONSE,  label: 전세 }
   - { code: MONTHLY, label: 월세 }
+  - { code: PRESALE, label: 분양권·입주권 }
 
 alert_level:      # 알림 강도 (목업 5종). 기본값 IMPORTANT_ONLY.
   - { code: ALL,                label: 모든 알림 }

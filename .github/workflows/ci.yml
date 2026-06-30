@@ -22,7 +22,7 @@ jobs:
           filters: |
             api: ['api/**']
             collector: ['collector/**']
-            web: ['web/**']
+            web: ['web/**', 'contracts/**']
             db: ['db/**']
 
   api:

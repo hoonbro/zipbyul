@@ -101,15 +101,26 @@ components:
 
     DeviceRequest:
       type: object
-      required: [deviceToken]
+      description: "FCM은 kind=FCM + deviceToken, 표준 WebPush는 kind=WEBPUSH + endpoint/p256dh/auth를 보낸다. kind 미지정 시 FCM."
       properties:
-        deviceToken: { type: string }
+        kind: { type: [string, 'null'], enum: [FCM, WEBPUSH, null] }
+        deviceToken: { type: [string, 'null'] }
+        endpoint: { type: [string, 'null'] }
+        p256dh: { type: [string, 'null'] }
+        auth: { type: [string, 'null'] }
     DeviceResponse:
       type: object
       properties:
         id: { type: integer, format: int64 }
-        deviceToken: { type: string }
+        deviceToken: { type: [string, 'null'] }
         pushEnabled: { type: boolean }
+
+    RegionItem:
+      type: object
+      properties:
+        bjdCode: { type: string, description: 법정동코드 10자리 }
+        guName: { type: string }
+        dongName: { type: string }
 
     MarketOutlookCard:
       type: object
@@ -153,7 +164,7 @@ components:
         regionName: { type: string }
         dong: { type: [string, 'null'] }
         complexName: { type: [string, 'null'] }
-        tradeType: { type: string, enum: [SALE, JEONSE, MONTHLY] }
+        tradeType: { type: string, enum: [SALE, JEONSE, MONTHLY, PRESALE] }
         areaM2: { type: [number, 'null'] }
         floor: { type: [integer, 'null'] }
         priceManwon: { type: [integer, 'null'], format: int64 }
@@ -162,12 +173,77 @@ components:
         contractMonth: { type: [string, 'null'] }
         firstSeenAt: { type: string, format: date-time }
         sourceName: { type: string }
+        buildYear: { type: [integer, 'null'] }
+        registeredAt: { type: [string, 'null'], format: date }
+        buildingDong: { type: [string, 'null'] }
+        dealingType: { type: [string, 'null'] }
+        jibun: { type: [string, 'null'] }
+        landAreaM2: { type: [number, 'null'] }
+        monthlyRentManwon: { type: [integer, 'null'], format: int64 }
 
     RecentTransactions:
       type: object
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/RecentTransactionItem' } }
         notice: { type: string }
+
+    ComplexSearchItem:
+      type: object
+      properties:
+        complexNorm: { type: string }
+        displayName: { type: string }
+        guName: { type: string }
+        transactionCount: { type: integer, format: int64 }
+        lastContractDate: { type: [string, 'null'], format: date }
+
+    ComplexSummaryItem:
+      type: object
+      properties:
+        complexNorm: { type: string }
+        displayName: { type: string }
+        guName: { type: string }
+        recentTransactionCount: { type: integer, format: int64 }
+        latestSalePriceManwon: { type: [integer, 'null'], format: int64 }
+        latestSaleContractDate: { type: [string, 'null'], format: date }
+        openAnnouncementCount: { type: integer, format: int64 }
+
+    WatchComplexRequest:
+      type: object
+      required: [guName, complexNorm, displayName]
+      properties:
+        guName: { type: string }
+        complexNorm: { type: string }
+        displayName: { type: string }
+
+    ComplexTrendPoint:
+      type: object
+      properties:
+        areaBand: { type: string }
+        month: { type: string, example: '2026-05' }
+        medianManwon: { type: integer, format: int64 }
+        count: { type: integer, format: int64 }
+
+    ComplexBandSummary:
+      type: object
+      properties:
+        areaBand: { type: string }
+        saleMedianManwon: { type: [integer, 'null'], format: int64 }
+        jeonseMedianManwon: { type: [integer, 'null'], format: int64 }
+        jeonseRatio: { type: [number, 'null'] }
+        gapManwon: { type: [integer, 'null'], format: int64 }
+        saleCount: { type: integer, format: int64 }
+        jeonseCount: { type: integer, format: int64 }
+
+    ComplexDetail:
+      type: object
+      properties:
+        complexNorm: { type: string }
+        displayName: { type: string }
+        guName: { type: string }
+        buildYear: { type: [integer, 'null'] }
+        saleTrend: { type: array, items: { $ref: '#/components/schemas/ComplexTrendPoint' } }
+        bandSummary: { type: array, items: { $ref: '#/components/schemas/ComplexBandSummary' } }
+        recentTransactions: { type: array, items: { $ref: '#/components/schemas/RecentTransactionItem' } }
 
     FeedHome:
       type: object
@@ -305,6 +381,8 @@ components:
         status: { type: string, enum: [SENT, FAILED, SKIPPED, DEDUPED] }
         finalScore: { type: [integer, 'null'] }
         sentAt: { type: string, format: date-time }
+        title: { type: [string, 'null'] }
+        body: { type: [string, 'null'] }
 
     SourceHealthItem:
       type: object
@@ -370,6 +448,20 @@ paths:
         '204': { description: 삭제됨 }
         '404': { $ref: '#/components/responses/Error404' }
 
+  /v1/push/vapid-public-key:
+    get:
+      tags: [user]
+      summary: 표준 WebPush 구독용 VAPID 공개키
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  publicKey: { type: string }
+
   /v1/me/data:
     delete:
       tags: [user]
@@ -394,6 +486,15 @@ paths:
       summary: 집값 전망 심리(서울 CSI) 현재값+추이
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/HousePriceOutlook' } } } }
+
+  /v1/regions:
+    get:
+      tags: [serving]
+      summary: 서울 법정동 목록(관심지역 동 좁힘·실거래 필터용)
+      parameters:
+        - { name: gu, in: query, schema: { type: string }, description: 자치구 필터. 없으면 전체 동 반환 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RegionItem' } } } } }
 
   /v1/calendar:
     get:
@@ -439,10 +540,43 @@ paths:
         - { name: region, in: query, schema: { type: string }, description: 자치구 }
         - { name: dong, in: query, schema: { type: string }, description: 법정동명 }
         - { name: bjdCode, in: query, schema: { type: string }, description: 법정동코드(있으면 region/dong 대신 해석) }
+        - { name: tradeType, in: query, schema: { type: string, enum: [SALE, JEONSE, MONTHLY, PRESALE] }, description: 거래유형 }
+        - { name: areaMin, in: query, schema: { type: number }, description: 전용면적 하한(㎡, 이상) }
+        - { name: areaMax, in: query, schema: { type: number }, description: 전용면적 상한(㎡, 미만) }
+        - { name: priceMin, in: query, schema: { type: integer, format: int64 }, description: 거래금액 하한(만원, 이상) }
+        - { name: priceMax, in: query, schema: { type: integer, format: int64 }, description: 거래금액 상한(만원, 이하) }
+        - { name: floorMin, in: query, schema: { type: integer }, description: 층 하한 }
+        - { name: floorMax, in: query, schema: { type: integer }, description: 층 상한 }
+        - { name: buildYearMin, in: query, schema: { type: integer }, description: 준공연도 하한 }
+        - { name: buildYearMax, in: query, schema: { type: integer }, description: 준공연도 상한 }
+        - { name: contractFrom, in: query, schema: { type: string, format: date }, description: 계약일 시작 }
+        - { name: contractTo, in: query, schema: { type: string, format: date }, description: 계약일 끝 }
         - { name: recentDays, in: query, schema: { type: integer, minimum: 1, maximum: 30 }, description: first_seen_at 기준 최근 N일 }
         - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RecentTransactions' } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+
+  /v1/complexes:
+    get:
+      tags: [serving]
+      summary: 실거래 기반 단지 검색
+      parameters:
+        - { name: gu, in: query, required: true, schema: { type: string }, description: 자치구 }
+        - { name: q, in: query, schema: { type: string }, description: 단지명 부분 검색어 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ComplexSearchItem' } } } } }
+        '400': { $ref: '#/components/responses/Error400' }
+
+  /v1/complexes/detail:
+    get:
+      tags: [serving]
+      summary: 단지 상세(평형대별 추이·최근 거래)
+      parameters:
+        - { name: gu, in: query, required: true, schema: { type: string }, description: 자치구 }
+        - { name: norm, in: query, required: true, schema: { type: string }, description: 정규화 단지명 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ComplexDetail' } } } }
         '400': { $ref: '#/components/responses/Error400' }
 
   /v1/watch/regions/summary:
@@ -452,6 +586,36 @@ paths:
       security: [{ anonymousId: [] }]
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RegionSummaryItem' } } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+
+  /v1/watch/complexes:
+    get:
+      tags: [serving]
+      summary: 관심단지 요약
+      security: [{ anonymousId: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ComplexSummaryItem' } } } } }
+        '404': { $ref: '#/components/responses/Error404' }
+    post:
+      tags: [serving]
+      summary: 관심단지 추가
+      security: [{ anonymousId: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WatchComplexRequest' } } }
+      responses:
+        '204': { description: 추가됨 }
+        '400': { $ref: '#/components/responses/Error400' }
+        '404': { $ref: '#/components/responses/Error404' }
+    delete:
+      tags: [serving]
+      summary: 관심단지 삭제
+      security: [{ anonymousId: [] }]
+      parameters:
+        - { name: guName, in: query, required: true, schema: { type: string } }
+        - { name: complexNorm, in: query, required: true, schema: { type: string } }
+      responses:
+        '204': { description: 삭제됨 }
         '404': { $ref: '#/components/responses/Error404' }
 
   /v1/notifications:

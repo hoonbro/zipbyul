@@ -80,7 +80,7 @@ export interface ComplexSummaryItem {
 
 export interface DeviceResponse {
   id: number
-  deviceToken: string
+  deviceToken: string | null
   pushEnabled: boolean
 }
 

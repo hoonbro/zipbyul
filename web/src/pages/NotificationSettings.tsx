@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import Chip from '../components/Chip'
 import PushSetup from '../components/PushSetup'
 import { ALERT_LEVELS, INTEREST_TYPES } from '../lib/constants'
@@ -28,7 +27,7 @@ export default function NotificationSettings() {
 
   return (
     <div className="space-y-6">
-      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">설정</h1>
+      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">알림 설정</h1>
 
       <PushSetup />
 
@@ -100,7 +99,6 @@ function SettingsForm({ prefs }: { prefs: Preferences }) {
   const [digestTime, setDigestTime] = useState(hhmm(prefs.dailyDigestTime) || '08:00')
   const [dndStart, setDndStart] = useState(hhmm(prefs.dndStart))
   const [dndEnd, setDndEnd] = useState(hhmm(prefs.dndEnd))
-  const [interestSheetOpen, setInterestSheetOpen] = useState(false)
 
   const toggleInterest = (code: string) =>
     setInterests((s) => (s.includes(code) ? s.filter((v) => v !== code) : [...s, code]))
@@ -119,42 +117,6 @@ function SettingsForm({ prefs }: { prefs: Preferences }) {
 
   return (
     <>
-      {/* 관심 설정 */}
-      <section>
-        <p className="mb-2 text-xs font-bold tracking-wide text-muted-2">관심 설정</p>
-        <div className="overflow-hidden rounded-[16px] border border-white/[0.07] bg-surface">
-          <Link
-            to="/watch?mode=edit"
-            className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3.5 active:bg-white/[0.03]"
-          >
-            <span className="text-[15px] font-semibold">관심지역</span>
-            <span className="flex items-center gap-1.5 text-muted-2">
-              <span className="text-sm text-muted">{prefs.watchRegions.length}개</span>
-              <span>›</span>
-            </span>
-          </Link>
-          <Link
-            to="/watch?tab=complex"
-            className="flex items-center justify-between border-b border-white/[0.05] px-4 py-3.5 active:bg-white/[0.03]"
-          >
-            <span className="text-[15px] font-semibold">관심단지</span>
-            <span className="text-muted-2">›</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setInterestSheetOpen(true)}
-            className="flex w-full items-center justify-between px-4 py-3.5 text-left active:bg-white/[0.03]"
-          >
-            <span className="text-[15px] font-semibold">관심유형</span>
-            <span className="flex items-center gap-1.5 text-muted-2">
-              <span className="text-sm text-muted">{interests.length}개</span>
-              <span>›</span>
-            </span>
-          </button>
-        </div>
-      </section>
-
-      {/* 알림 강도 */}
       <section>
         <h2 className="mb-3 text-base font-extrabold tracking-tight">알림 강도</h2>
         <div className="flex flex-col gap-2.5">
@@ -182,7 +144,17 @@ function SettingsForm({ prefs }: { prefs: Preferences }) {
         </div>
       </section>
 
-      {/* 알림 옵션 */}
+      <section>
+        <h2 className="mb-3 text-base font-extrabold tracking-tight">관심 유형</h2>
+        <div className="flex flex-wrap gap-2.5">
+          {INTEREST_TYPES.map((t) => (
+            <Chip key={t.code} selected={interests.includes(t.code)} disabled={!t.available} onClick={() => toggleInterest(t.code)}>
+              {t.label}
+            </Chip>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-3.5 rounded-[15px] border border-white/[0.06] bg-surface p-4">
         <label className="flex items-center justify-between text-sm">
           <span className="text-ink-2">실거래 즉시 알림</span>
@@ -218,65 +190,6 @@ function SettingsForm({ prefs }: { prefs: Preferences }) {
       </button>
       {save.isSuccess && <p className="text-center text-xs text-mint">저장됐습니다.</p>}
       {save.isError && <p className="text-center text-xs text-coral">저장 실패</p>}
-
-      {/* 관심유형 바텀시트 */}
-      {interestSheetOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
-          onClick={() => setInterestSheetOpen(false)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-[430px] overflow-y-auto rounded-t-[22px] border-t border-white/10 bg-bg px-5 pb-8 pt-3 [scrollbar-width:none]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15" />
-            <h2 className="text-[17px] font-extrabold">관심유형</h2>
-            <p className="mt-1 text-[13px] text-muted">고른 유형의 일정과 공고를 우선 보여드려요</p>
-
-            <div className="mt-5 space-y-5">
-              {groupedInterestTypes().map((grp) => (
-                <div key={grp.title}>
-                  <p className="mb-2.5 text-xs font-bold text-muted-2">{grp.title}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {grp.items.map((t) => (
-                      <Chip
-                        key={t.code}
-                        selected={interests.includes(t.code)}
-                        disabled={!t.available}
-                        onClick={() => toggleInterest(t.code)}
-                      >
-                        {t.label}
-                      </Chip>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setInterestSheetOpen(false)}
-              className="mt-6 w-full rounded-[14px] bg-mint py-3.5 text-sm font-bold text-mint-ink"
-            >
-              완료
-            </button>
-          </div>
-        </div>
-      )}
     </>
   )
-}
-
-function groupedInterestTypes() {
-  const groups: { title: string; codes: string[] }[] = [
-    { title: '청약', codes: ['PRIVATE_SALE_SUB', 'UNRANKED_SUB'] },
-    { title: '공공임대', codes: ['HAPPY_HOUSE', 'PURCHASE_RENTAL', 'YOUTH_SAFE_HOUSE', 'LONG_TERM_JEONSE'] },
-    { title: '시장', codes: ['POLICY_RATE', 'TRANSACTION', 'HOUSE_PRICE_OUTLOOK'] },
-  ]
-  return groups.map((g) => ({
-    title: g.title,
-    items: g.codes
-      .map((code) => INTEREST_TYPES.find((t) => t.code === code))
-      .filter(Boolean) as typeof INTEREST_TYPES,
-  })).filter((g) => g.items.length > 0)
 }

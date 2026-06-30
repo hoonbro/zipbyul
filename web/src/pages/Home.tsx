@@ -4,7 +4,9 @@ import DDayBadge from '../components/DDayBadge'
 import NotificationCenter from '../components/NotificationCenter'
 import StarRating from '../components/StarRating'
 import { eventTag } from '../lib/colors'
+import { TRADE_TYPE_LABELS } from '../lib/constants'
 import { useFeedHome, useNotifications } from '../lib/hooks'
+import type { FeedHome } from '../lib/types'
 
 const NOTIF_SEEN_KEY = 'jb_notif_last_seen'
 
@@ -203,41 +205,102 @@ export default function Home() {
         </Link>
       </section>
 
-      {/* 실거래 + 관심지역 요약 */}
-      <div className="flex gap-2.5">
-        <Link
-          to="/transactions"
-          className="flex flex-1 flex-col gap-1.5 rounded-[16px] border border-white/[0.07] bg-surface px-4 py-4"
-        >
-          <span className="text-[11px] text-muted-2">오늘 새 실거래</span>
-          <span className="font-mono text-[26px] font-bold leading-none">{data.recentTransactions.length}</span>
-          <span className="text-[11px] font-bold text-sky">관심지역 기준 ›</span>
-        </Link>
-        <Link
-          to="/watch"
-          className="flex flex-1 flex-col justify-between gap-2 rounded-[16px] border border-white/[0.07] bg-surface px-4 py-4"
-        >
-          <span className="text-[11px] text-muted-2">관심지역 움직임</span>
-          <span className="text-[15px] font-bold leading-snug">
-            {data.regionSummary.length}개 지역<br />
-            <span className="text-[13px] font-semibold text-muted">
-              신규 공고 {data.regionSummary.reduce((s, r) => s + r.announcementCount, 0)}건
-            </span>
-          </span>
-          <span className="text-[11px] font-bold text-mint">보기 ›</span>
-        </Link>
-      </div>
+      {/* 내 관심지역 */}
+      <section>
+        <SectionHead title="내 관심지역" to="/watch" linkLabel="편집" />
+        <MyRegions regions={data.regionSummary} />
+      </section>
 
-      {data.dataFreshness.notices.map((n) => (
-        <div key={n} className="flex gap-1.5 px-0.5">
-          <span className="text-xs text-muted-2">ⓘ</span>
-          <span className="text-xs leading-snug text-muted-2">{n}</span>
+      {/* 실거래 신규 등록 */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-extrabold tracking-tight">실거래 신규 등록</h2>
+            <span className="rounded-md bg-mint/15 px-1.5 py-px text-[10px] text-mint">신규</span>
+          </div>
+          <Link to="/transactions" className="text-xs text-muted-2">
+            전체 보기 ›
+          </Link>
         </div>
-      ))}
+        {data.recentTransactions.length === 0 ? (
+          <p className="text-xs text-muted-2">최근 등록된 실거래가 없습니다.</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {data.recentTransactions.map((t) => {
+              const c = t.tradeType === 'SALE' ? '#3df5c5' : '#5ba8ff'
+              return (
+                <li key={t.transactionId} className="flex items-center gap-3 rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3">
+                  <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold" style={{ color: c, background: `${c}22` }}>
+                    {TRADE_TYPE_LABELS[t.tradeType] ?? t.tradeType}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold">{t.complexName ?? '(단지 미상)'}</div>
+                    <div className="mt-0.5 text-xs text-muted-2">
+                      {t.regionName} {t.dong ?? ''}
+                      {t.areaM2 != null && ` · ${t.areaM2}㎡`}
+                      {t.floor != null && ` · ${t.floor}층`}
+                    </div>
+                  </div>
+                  {t.priceText && (
+                    <span className="shrink-0 font-mono text-[14px] font-bold">
+                      {t.tradeType === 'MONTHLY' && t.monthlyRentManwon != null
+                        ? `${t.priceText} / ${t.monthlyRentManwon.toLocaleString()}만`
+                        : t.priceText}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {data.dataFreshness.notices.map((n) => (
+          <div key={n} className="mt-3 flex gap-1.5 px-0.5">
+            <span className="text-xs text-muted-2">ⓘ</span>
+            <span className="text-xs leading-snug text-muted-2">{n}</span>
+          </div>
+        ))}
+      </section>
     </div>
   )
 }
 
+const REGION_PREVIEW = 5
+
+function MyRegions({ regions }: { regions: FeedHome['regionSummary'] }) {
+  const [showAll, setShowAll] = useState(false)
+  if (regions.length === 0) {
+    return <p className="text-xs text-muted-2">선택한 관심지역이 없습니다.</p>
+  }
+  const visible = showAll ? regions : regions.slice(0, REGION_PREVIEW)
+  return (
+    <>
+      <ul className="space-y-2.5">
+        {visible.map((r) => (
+          <li key={r.regionName} className="flex items-center justify-between rounded-[15px] border border-white/[0.06] bg-surface px-4 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="h-[7px] w-[7px] rounded-full bg-mint" style={{ boxShadow: '0 0 7px #3df5c5' }} />
+              <span className="text-[15px] font-bold">{r.regionName}</span>
+            </div>
+            <div className="flex gap-3.5">
+              <Stat v={r.announcementCount} k="공고" color="#5ba8ff" />
+              <Stat v={r.deadlineCount} k="마감임박" color="#ffce5a" />
+              <Stat v={r.recentTransactionCount} k="실거래" color="#3df5c5" />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {regions.length > REGION_PREVIEW && (
+        <button
+          type="button"
+          onClick={() => setShowAll((s) => !s)}
+          className="mt-2.5 w-full rounded-[12px] border border-white/[0.08] py-2.5 text-xs font-bold text-muted-2"
+        >
+          {showAll ? '접기 ▴' : `전체 ${regions.length}개 보기 ▾`}
+        </button>
+      )}
+    </>
+  )
+}
 
 function SectionHead({ title, to, linkLabel }: { title: string; to: string; linkLabel: string }) {
   return (
@@ -260,5 +323,16 @@ function SoonCard({ k }: { k: string }) {
       <div className="font-mono text-[23px] font-bold leading-none text-muted-2">–</div>
       <div className="mt-1.5 text-[11px] font-bold whitespace-nowrap text-violet">개발 예정</div>
     </Link>
+  )
+}
+
+function Stat({ v, k, color }: { v: number; k: string; color: string }) {
+  return (
+    <div className="text-center">
+      <div className="font-mono text-[15px] font-bold" style={{ color }}>
+        {v}
+      </div>
+      <div className="mt-px text-[10px] text-muted-2">{k}</div>
+    </div>
   )
 }

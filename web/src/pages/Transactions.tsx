@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import Chip from '../components/Chip'
 import { SEOUL_GU, TRADE_TYPE_LABELS } from '../lib/constants'
 import {
@@ -10,272 +10,145 @@ import {
 } from '../lib/hooks'
 import type { RecentTransaction } from '../lib/types'
 
-const PYEONG_TO_M2 = 3.3058
-
-const FLOOR_BAND_RANGE: Record<string, [number, number]> = {
-  저층: [1, 5], 중층: [6, 15], 고층: [16, 99],
-}
-
-const AREA_QUICK = [
-  { label: '전체', lo: 0, hi: 60 },
-  { label: '~10평', lo: 0, hi: 10 },
-  { label: '10평대', lo: 10, hi: 20 },
-  { label: '20평대', lo: 20, hi: 30 },
-  { label: '30평대', lo: 30, hi: 40 },
-  { label: '40평+', lo: 40, hi: 60 },
-]
-
-const BUILT_PRESETS = [
-  { label: '전체', v: null as number | null },
-  { label: '5년이내', v: 5 },
-  { label: '10년이내', v: 10 },
-  { label: '15년이내', v: 15 },
-  { label: '20년이내', v: 20 },
-]
-
-const QUICK_TYPES = [
-  { label: '전체', value: '' },
-  { label: '매매', value: 'SALE' },
-  { label: '전세', value: 'JEONSE' },
-  { label: '월세', value: 'MONTHLY' },
-]
-
-const FILTER_TYPES = [...QUICK_TYPES, { label: '분양권', value: 'PRESALE' }]
+const TRADE_TYPE_FILTERS = ['SALE', 'JEONSE', 'MONTHLY', 'PRESALE'] as const
+const PYEONG_TO_M2 = 3.3058 // 1평 ≈ 3.3058㎡
 
 interface TxFilters {
   gu: string
   dong: string
   tradeType: string
-  eokMin: number
-  eokMax: number
-  pyeongMin: number
-  pyeongMax: number
-  areaUnit: 'pyeong' | 'sqm'
-  floorBands: string[]
-  builtPreset: number | null
+  pyeongMin: string
+  pyeongMax: string
+  eokMin: string
+  eokMax: string
+  floorMin: string
+  floorMax: string
   yearMin: string
   yearMax: string
   dateFrom: string
   dateTo: string
-  recentDays: number | null
 }
 
-const EMPTY: TxFilters = {
-  gu: '', dong: '', tradeType: '',
-  eokMin: 0, eokMax: 50,
-  pyeongMin: 0, pyeongMax: 60,
-  areaUnit: 'pyeong',
-  floorBands: [],
-  builtPreset: null, yearMin: '', yearMax: '',
-  dateFrom: '', dateTo: '',
-  recentDays: null,
+const EMPTY_FILTERS: TxFilters = {
+  gu: '',
+  dong: '',
+  tradeType: '',
+  pyeongMin: '',
+  pyeongMax: '',
+  eokMin: '',
+  eokMax: '',
+  floorMin: '',
+  floorMax: '',
+  yearMin: '',
+  yearMax: '',
+  dateFrom: '',
+  dateTo: '',
+}
+
+const num = (s: string): number | undefined => {
+  const v = Number(s)
+  return s.trim() !== '' && !Number.isNaN(v) ? v : undefined
 }
 
 function toParams(f: TxFilters): RecentTransactionParams {
-  const areaMin = f.pyeongMin > 0 ? +(f.pyeongMin * PYEONG_TO_M2).toFixed(2) : undefined
-  const areaMax = f.pyeongMax < 60 ? +(f.pyeongMax * PYEONG_TO_M2).toFixed(2) : undefined
-  const priceMin = f.eokMin > 0 ? Math.round(f.eokMin * 10000) : undefined
-  const priceMax = f.eokMax < 50 ? Math.round(f.eokMax * 10000) : undefined
-
-  let floorMin: number | undefined
-  let floorMax: number | undefined
-  if (f.floorBands.length > 0) {
-    const ranges = f.floorBands.map((b) => FLOOR_BAND_RANGE[b])
-    floorMin = Math.min(...ranges.map((r) => r[0]))
-    floorMax = Math.max(...ranges.map((r) => r[1]))
-  }
-
-  let buildYearMin: number | undefined
-  let buildYearMax: number | undefined
-  if (f.builtPreset != null) {
-    buildYearMin = new Date().getFullYear() - f.builtPreset
-  } else {
-    buildYearMin = f.yearMin ? Number(f.yearMin) : undefined
-    buildYearMax = f.yearMax ? Number(f.yearMax) : undefined
-  }
-
+  const pyMin = num(f.pyeongMin)
+  const pyMax = num(f.pyeongMax)
+  const eokMin = num(f.eokMin)
+  const eokMax = num(f.eokMax)
   return {
     region: f.gu || undefined,
     dong: f.gu ? f.dong || undefined : undefined,
     tradeType: f.tradeType || undefined,
-    areaMin, areaMax, priceMin, priceMax,
-    floorMin, floorMax, buildYearMin, buildYearMax,
+    areaMin: pyMin != null ? +(pyMin * PYEONG_TO_M2).toFixed(2) : undefined,
+    areaMax: pyMax != null ? +(pyMax * PYEONG_TO_M2).toFixed(2) : undefined,
+    priceMin: eokMin != null ? Math.round(eokMin * 10000) : undefined,
+    priceMax: eokMax != null ? Math.round(eokMax * 10000) : undefined,
+    floorMin: num(f.floorMin),
+    floorMax: num(f.floorMax),
+    buildYearMin: num(f.yearMin),
+    buildYearMax: num(f.yearMax),
     contractFrom: f.dateFrom || undefined,
     contractTo: f.dateTo || undefined,
-    recentDays: f.recentDays ?? undefined,
   }
 }
 
-interface ActiveChip { label: string; clear: () => void }
+function rangeText(min: string, max: string, unit: string): string | null {
+  if (!min && !max) return null
+  if (min && max) return `${min}~${max}${unit}`
+  if (min) return `${min}${unit}+`
+  return `~${max}${unit}`
+}
 
-function computeActiveChips(f: TxFilters, set: (p: Partial<TxFilters>) => void): ActiveChip[] {
-  const out: ActiveChip[] = []
-  if (f.gu) out.push({ label: f.dong ? `${f.gu} ${f.dong}` : f.gu, clear: () => set({ gu: '', dong: '' }) })
-  if (f.eokMin > 0 || f.eokMax < 50) out.push({
-    label: `${f.eokMin > 0 ? fmtEok(f.eokMin) : ''}~${f.eokMax < 50 ? fmtEok(f.eokMax) : ''}억`,
-    clear: () => set({ eokMin: 0, eokMax: 50 }),
-  })
-  if (f.pyeongMin > 0 || f.pyeongMax < 60) {
-    const conv = (v: number) => f.areaUnit === 'sqm' ? `${Math.round(v * PYEONG_TO_M2)}㎡` : `${v}평`
-    out.push({
-      label: `${f.pyeongMin > 0 ? conv(f.pyeongMin) : ''}~${f.pyeongMax < 60 ? conv(f.pyeongMax) : ''}`,
-      clear: () => set({ pyeongMin: 0, pyeongMax: 60 }),
-    })
-  }
-  if (f.floorBands.length) out.push({ label: f.floorBands.join('·'), clear: () => set({ floorBands: [] }) })
-  if (f.builtPreset != null) out.push({ label: `${f.builtPreset}년이내`, clear: () => set({ builtPreset: null }) })
-  else if (f.yearMin || f.yearMax) out.push({ label: `준공 ${f.yearMin || ''}~${f.yearMax || ''}`, clear: () => set({ yearMin: '', yearMax: '' }) })
-  if (f.dateFrom || f.dateTo) out.push({ label: `계약 ${f.dateFrom || '…'}~${f.dateTo || '…'}`, clear: () => set({ dateFrom: '', dateTo: '' }) })
-  if (f.recentDays != null) out.push({ label: `최근 ${f.recentDays}일 등록`, clear: () => set({ recentDays: null }) })
+function summaryChips(f: TxFilters): string[] {
+  const out: string[] = []
+  if (f.gu) out.push(`${f.gu}${f.dong ? ` ${f.dong}` : ''}`)
+  if (f.tradeType) out.push(TRADE_TYPE_LABELS[f.tradeType] ?? f.tradeType)
+  const py = rangeText(f.pyeongMin, f.pyeongMax, '평')
+  if (py) out.push(py)
+  const eok = rangeText(f.eokMin, f.eokMax, '억')
+  if (eok) out.push(eok)
+  const fl = rangeText(f.floorMin, f.floorMax, '층')
+  if (fl) out.push(fl)
+  const yr = rangeText(f.yearMin, f.yearMax, '년')
+  if (yr) out.push(yr)
+  if (f.dateFrom || f.dateTo) out.push(`계약 ${f.dateFrom || '…'}~${f.dateTo || '…'}`)
   return out
 }
 
-function initialFilters(searchParams: URLSearchParams): TxFilters {
-  const recentDays = Number(searchParams.get('recentDays'))
-  return {
-    ...EMPTY,
-    gu: searchParams.get('region') || '',
-    dong: searchParams.get('dong') || '',
-    tradeType: searchParams.get('tradeType') || '',
-    recentDays: Number.isFinite(recentDays) && recentDays > 0 ? recentDays : null,
-  }
-}
-
-const fmtEok = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
-
-// 양방향 슬라이더
-const RANGE_CLS = [
-  'absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent',
-  '[&::-webkit-slider-runnable-track]:bg-transparent',
-  '[&::-webkit-slider-thumb]:appearance-none',
-  '[&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5',
-  '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer',
-  '[&::-webkit-slider-thumb]:bg-ink',
-  '[&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-bg',
-  '[&::-webkit-slider-thumb]:shadow-[0_1px_5px_rgba(0,0,0,0.55)]',
-  '[&::-moz-range-track]:bg-transparent',
-  '[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5',
-  '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer',
-  '[&::-moz-range-thumb]:bg-ink [&::-moz-range-thumb]:appearance-none',
-  '[&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-bg',
-].join(' ')
-
-// 썸(thumb) 반지름 10px → 양 끝에서 잘리지 않도록 수평 패딩 10px 확보
-function DualSlider({ min, max, step, lo, hi, onLo, onHi }: {
-  min: number; max: number; step: number
-  lo: number; hi: number
-  onLo: (v: number) => void; onHi: (v: number) => void
-}) {
-  const range = max - min
-  const loPct = range === 0 ? 0 : ((lo - min) / range) * 100
-  const hiPct = range === 0 ? 100 : ((hi - min) / range) * 100
-  return (
-    <div className="relative h-8 select-none px-2.5">
-      <div className="pointer-events-none absolute inset-x-2.5 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface-2" />
-      <div
-        className="pointer-events-none absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-mint"
-        style={{ left: `calc(10px + ${loPct}% * (100% - 20px) / 100%)`, right: `calc(10px + ${100 - hiPct}% * (100% - 20px) / 100%)` }}
-      />
-      <input
-        type="range" min={min} max={max} step={step} value={lo}
-        onChange={(e) => onLo(Math.min(Number(e.target.value), hi - step))}
-        className={RANGE_CLS}
-        style={{ zIndex: lo >= max - step ? 5 : 3 }}
-      />
-      <input
-        type="range" min={min} max={max} step={step} value={hi}
-        onChange={(e) => onHi(Math.max(Number(e.target.value), lo + step))}
-        className={RANGE_CLS}
-        style={{ zIndex: 4 }}
-      />
-    </div>
-  )
-}
-
 export default function Transactions() {
-  const [searchParams] = useSearchParams()
   const prefs = usePreferences()
-  const watchGus = [...new Set(prefs.data?.watchRegions.map((r) => r.guName) ?? [])]
-  const [filters, setFilters] = useState<TxFilters>(() => initialFilters(searchParams))
+  const watchGus = prefs.data?.watchRegions.map((r) => r.guName) ?? []
+  const [filters, setFilters] = useState<TxFilters>(EMPTY_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
   const [selected, setSelected] = useState<RecentTransaction | null>(null)
 
-  const set = (patch: Partial<TxFilters>) => setFilters((f) => ({ ...f, ...patch }))
   const tx = useRecentTransactions(toParams(filters))
   const guOptions = watchGus.length > 0 ? watchGus : [...SEOUL_GU]
-  const activeChips = computeActiveChips(filters, set)
+  const chips = summaryChips(filters)
 
   return (
-    <div className="space-y-4">
-      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">실거래</h1>
+    <div className="space-y-5">
+      <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">실거래 신규 등록</h1>
 
-      {/* 유형 퀵칩 + 필터 버튼 */}
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {QUICK_TYPES.map(({ label, value }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => set({ tradeType: value })}
-              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors ${
-                filters.tradeType === value
-                  ? 'border-mint/55 bg-mint/15 text-mint'
-                  : 'border-white/10 bg-surface text-muted'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setFilterOpen(true)}
-          className="flex shrink-0 items-center gap-1.5 rounded-[12px] border border-white/10 bg-surface px-3.5 py-2 text-[13px] font-bold"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M4 6h16M7 12h10M10 18h4" />
-          </svg>
-          필터
-          {activeChips.length > 0 && (
-            <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-mint px-1 font-mono text-[11px] font-bold text-mint-ink">
-              {activeChips.length}
+      <button
+        type="button"
+        onClick={() => setFilterOpen(true)}
+        className="flex w-full items-center justify-between rounded-[14px] border border-white/[0.08] bg-surface px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-sm font-bold">
+          <span>⚙︎ 필터</span>
+          {chips.length > 0 && (
+            <span className="rounded-full bg-mint/20 px-2 py-0.5 text-[11px] font-bold text-mint">
+              {chips.length}
             </span>
           )}
-        </button>
-      </div>
+        </span>
+        <span className="text-muted-2">›</span>
+      </button>
 
-      {/* 활성 필터칩 (개별 ✕ 삭제) */}
-      {activeChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {activeChips.map((c) => (
-            <button
-              key={c.label}
-              type="button"
-              onClick={c.clear}
-              className="inline-flex items-center gap-1.5 rounded-full border border-mint/35 bg-mint/10 px-3 py-1.5 text-[12px] font-semibold text-mint"
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <span
+              key={c}
+              className="rounded-full border border-white/10 bg-surface px-2.5 py-1 text-xs font-semibold text-muted"
             >
-              {c.label} <span className="opacity-70">✕</span>
-            </button>
+              {c}
+            </span>
           ))}
-          <button type="button" onClick={() => setFilters(EMPTY)} className="px-2 py-1 text-[12px] font-semibold text-muted-2 underline">
+          <button
+            type="button"
+            onClick={() => setFilters(EMPTY_FILTERS)}
+            className="rounded-full px-2 py-1 text-xs font-semibold text-muted-2 underline"
+          >
             초기화
           </button>
         </div>
       )}
 
       {tx.isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
-      {tx.data && (
-        <p className="text-[13px] text-muted-2">
-          총 <span className="font-mono font-bold text-ink">{tx.data.items.length}</span>건
-        </p>
-      )}
       {tx.data && tx.data.items.length === 0 && (
-        <div className="py-10 text-center">
-          <p className="text-sm text-muted-2">조건에 맞는 실거래가 없어요</p>
-          <button type="button" onClick={() => setFilters(EMPTY)} className="mt-2 text-[13px] font-semibold text-mint">
-            필터 초기화
-          </button>
-        </div>
+        <p className="text-sm text-muted-2">조건에 맞는 실거래가 없습니다.</p>
       )}
 
       <ul className="space-y-2.5">
@@ -296,7 +169,10 @@ export default function Transactions() {
         <FilterSheet
           initial={filters}
           guOptions={guOptions}
-          onApply={(next) => { setFilters(next); setFilterOpen(false) }}
+          onApply={(next) => {
+            setFilters(next)
+            setFilterOpen(false)
+          }}
           onClose={() => setFilterOpen(false)}
         />
       )}
@@ -304,12 +180,14 @@ export default function Transactions() {
   )
 }
 
+// 계약일 ISO(2026-06-27) → "06.27"
 function fmtContract(d: string | null): string | null {
   if (!d) return null
   const [, m, day] = d.split('-')
   return m && day ? `${m}.${day}` : d
 }
 
+// 월세는 '보증금 / 월세'로 표기. priceText는 보증금(억·만 환산).
 function priceLabel(t: RecentTransaction): string | null {
   if (!t.priceText) return null
   if (t.tradeType === 'MONTHLY' && t.monthlyRentManwon != null) {
@@ -348,6 +226,7 @@ function TxRow({ t, onClick }: { t: RecentTransaction; onClick: () => void }) {
   )
 }
 
+// complex_norm: V10 인덱스/안전마진과 동일 규칙(공백·괄호·숫자·'차' 제거).
 function complexNormOf(name: string): string {
   return name.replace(/[\s()0-9차]/g, '')
 }
@@ -373,12 +252,16 @@ function TxDetailSheet({ t, onClose }: { t: RecentTransaction; onClose: () => vo
   rows.push({ k: '출처', v: t.sourceName })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-[430px] overflow-x-hidden rounded-t-[22px] border-t border-white/10 bg-bg px-5 pb-8 pt-3"
+        className="w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-bg px-5 pb-8 pt-3"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15" />
+
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -391,6 +274,7 @@ function TxDetailSheet({ t, onClose }: { t: RecentTransaction; onClose: () => vo
           </div>
           {priceLabel(t) && <span className="shrink-0 font-mono text-[17px] font-extrabold">{priceLabel(t)}</span>}
         </div>
+
         <dl className="mt-4 divide-y divide-white/[0.06]">
           {rows.map((r) => (
             <div key={r.k} className="flex justify-between gap-4 py-2.5">
@@ -399,16 +283,26 @@ function TxDetailSheet({ t, onClose }: { t: RecentTransaction; onClose: () => vo
             </div>
           ))}
         </dl>
+
         {norm && (
           <button
             type="button"
-            onClick={() => navigate(`/complex?gu=${encodeURIComponent(t.regionName)}&norm=${encodeURIComponent(norm)}&name=${encodeURIComponent(t.complexName ?? '')}`)}
+            onClick={() =>
+              navigate(
+                `/complex?gu=${encodeURIComponent(t.regionName)}&norm=${encodeURIComponent(norm)}&name=${encodeURIComponent(t.complexName ?? '')}`,
+              )
+            }
             className="mt-5 w-full rounded-[14px] bg-mint py-3.5 text-sm font-bold text-mint-ink"
           >
             이 단지 시세 추이 보기 →
           </button>
         )}
-        <button type="button" onClick={onClose} className="mt-2.5 w-full rounded-[14px] bg-surface py-3.5 text-sm font-bold">
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-2.5 w-full rounded-[14px] bg-surface py-3.5 text-sm font-bold"
+        >
           닫기
         </button>
       </div>
@@ -416,204 +310,129 @@ function TxDetailSheet({ t, onClose }: { t: RecentTransaction; onClose: () => vo
   )
 }
 
-function FilterSheet({ initial, guOptions, onApply, onClose }: {
+function FilterSheet({
+  initial,
+  guOptions,
+  onApply,
+  onClose,
+}: {
   initial: TxFilters
   guOptions: string[]
   onApply: (f: TxFilters) => void
   onClose: () => void
 }) {
   const [d, setD] = useState<TxFilters>(initial)
-  const set = (patch: Partial<TxFilters>) => setD((prev) => ({ ...prev, ...patch }))
   const regions = useRegions(d.gu || null)
-
-  const priceFull = d.eokMin <= 0 && d.eokMax >= 50
-  const priceReadout = priceFull ? '전체 금액' : `${d.eokMin > 0 ? fmtEok(d.eokMin) : ''}~${d.eokMax < 50 ? fmtEok(d.eokMax) : ''}억`
-
-  const conv = (v: number) => d.areaUnit === 'sqm' ? `${Math.round(v * PYEONG_TO_M2)}㎡` : `${v}평`
-  const areaFull = d.pyeongMin <= 0 && d.pyeongMax >= 60
-  const areaReadout = areaFull ? '전체 면적' : `${d.pyeongMin > 0 ? conv(d.pyeongMin) : ''}~${d.pyeongMax < 60 ? conv(d.pyeongMax) : ''}`
-
-  const builtDirect = !!(d.yearMin || d.yearMax)
+  const set = (patch: Partial<TxFilters>) => setD((prev) => ({ ...prev, ...patch }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-[430px] overflow-x-hidden overflow-y-auto rounded-t-[22px] border-t border-white/10 bg-bg px-5 pb-8 pt-3 [scrollbar-width:none]"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-[22px] border-t border-white/10 bg-bg px-5 pb-8 pt-3"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15" />
         <div className="flex items-center justify-between">
           <h2 className="text-[17px] font-extrabold">필터</h2>
-          <button type="button" onClick={() => setD(EMPTY)} className="text-xs font-semibold text-muted-2 underline">
+          <button
+            type="button"
+            onClick={() => setD(EMPTY_FILTERS)}
+            className="text-xs font-semibold text-muted-2 underline"
+          >
             전체 초기화
           </button>
         </div>
 
-        <div className="mt-5 space-y-6">
-          {/* 거래유형 */}
-          <FilterSection label="거래유형">
-            <div className="flex flex-wrap gap-2">
-              {FILTER_TYPES.map(({ label, value }) => (
-                <Chip key={value} selected={d.tradeType === value} onClick={() => set({ tradeType: value })}>
-                  {label}
-                </Chip>
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* 거래금액 */}
-          <FilterSection label="거래금액" readout={priceReadout}>
-            <DualSlider
-              min={0} max={50} step={0.5}
-              lo={d.eokMin} hi={d.eokMax}
-              onLo={(v) => set({ eokMin: v })}
-              onHi={(v) => set({ eokMax: v })}
-            />
-            <div className="mt-2 flex items-center gap-2">
-              <PriceInput
-                label="최소"
-                value={d.eokMin === 0 ? '' : fmtEok(d.eokMin)}
-                placeholder="0"
-                onChange={(raw) => {
-                  const v = parseFloat(raw)
-                  if (!raw) set({ eokMin: 0 })
-                  else if (!Number.isNaN(v)) set({ eokMin: Math.max(0, Math.min(v, d.eokMax - 0.5)) })
-                }}
-                suffix="억"
-              />
-              <span className="text-muted-2">~</span>
-              <PriceInput
-                label="최대"
-                value={d.eokMax >= 50 ? '' : fmtEok(d.eokMax)}
-                placeholder="50"
-                onChange={(raw) => {
-                  const v = parseFloat(raw)
-                  if (!raw) set({ eokMax: 50 })
-                  else if (!Number.isNaN(v)) set({ eokMax: Math.min(50, Math.max(v, d.eokMin + 0.5)) })
-                }}
-                suffix="억"
-              />
-            </div>
-            <p className="mt-1.5 text-[11px] text-muted-2">전세·월세는 보증금 기준</p>
-          </FilterSection>
-
-          {/* 면적 */}
-          <FilterSection
-            label="면적 (전용)"
-            readout={areaReadout}
-            right={
-              <div className="flex rounded-[8px] bg-surface-2 p-0.5">
-                {(['pyeong', 'sqm'] as const).map((u) => (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => set({ areaUnit: u })}
-                    className={`rounded-[6px] px-3 py-1 text-[12px] font-bold transition-colors ${d.areaUnit === u ? 'bg-mint text-mint-ink' : 'text-muted-2'}`}
-                  >
-                    {u === 'pyeong' ? '평' : '㎡'}
-                  </button>
-                ))}
-              </div>
-            }
-          >
-            <DualSlider
-              min={0} max={60} step={1}
-              lo={d.pyeongMin} hi={d.pyeongMax}
-              onLo={(v) => set({ pyeongMin: v })}
-              onHi={(v) => set({ pyeongMax: v })}
-            />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {AREA_QUICK.map(({ label, lo, hi }) => (
-                <Chip
-                  key={label}
-                  selected={d.pyeongMin === lo && d.pyeongMax === hi}
-                  onClick={() => set({ pyeongMin: lo, pyeongMax: hi })}
-                >
-                  {label}
-                </Chip>
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* 층수 */}
-          <FilterSection label="층수">
-            <div className="flex gap-2">
-              {(['저층', '중층', '고층'] as const).map((b) => (
-                <Chip
-                  key={b}
-                  selected={d.floorBands.includes(b)}
-                  onClick={() =>
-                    set({
-                      floorBands: d.floorBands.includes(b)
-                        ? d.floorBands.filter((x) => x !== b)
-                        : [...d.floorBands, b],
-                    })
-                  }
-                >
-                  {b}
-                </Chip>
-              ))}
-            </div>
-          </FilterSection>
-
-          {/* 연식 */}
-          <FilterSection label="연식">
-            <div className="flex flex-wrap gap-2">
-              {BUILT_PRESETS.map(({ label, v }) => (
-                <Chip
-                  key={label}
-                  selected={!builtDirect && d.builtPreset === v}
-                  onClick={() => set({ builtPreset: v, yearMin: '', yearMax: '' })}
-                >
-                  {label}
-                </Chip>
-              ))}
-            </div>
-            <div className="mt-2 flex items-center gap-1.5">
-              <YearInput
-                value={d.yearMin}
-                placeholder="시작년도"
-                onChange={(v) => set({ yearMin: v, builtPreset: null })}
-              />
-              <span className="shrink-0 text-xs text-muted-2">~</span>
-              <YearInput
-                value={d.yearMax}
-                placeholder="종료년도"
-                onChange={(v) => set({ yearMax: v, builtPreset: null })}
-              />
-            </div>
-            <p className="mt-1.5 text-[11px] text-muted-2">준공년도 직접 입력 (예: 2005 ~ 2020)</p>
-          </FilterSection>
-
-          {/* 지역 */}
-          <FilterSection label="지역">
-            <div className="flex gap-2">
-              <GSelect
+        <div className="mt-5 space-y-5">
+          <Section label="지역">
+            <div className="flex gap-2.5">
+              <Select
                 value={d.gu}
                 onChange={(v) => set({ gu: v, dong: '' })}
                 placeholder="전체 자치구"
               >
-                {guOptions.map((g) => <option key={g} value={g}>{g}</option>)}
-              </GSelect>
-              <GSelect
+                {guOptions.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </Select>
+              <Select
                 value={d.dong}
                 onChange={(v) => set({ dong: v })}
                 placeholder={d.gu ? '전체 동' : '구 먼저 선택'}
                 disabled={!d.gu || regions.isLoading}
               >
-                {regions.data?.map((r) => <option key={r.bjdCode} value={r.dongName}>{r.dongName}</option>)}
-              </GSelect>
+                {regions.data?.map((r) => (
+                  <option key={r.bjdCode} value={r.dongName}>
+                    {r.dongName}
+                  </option>
+                ))}
+              </Select>
             </div>
-          </FilterSection>
+          </Section>
 
-          {/* 거래일 */}
-          <FilterSection label="거래일">
+          <Section label="유형">
+            <div className="flex flex-wrap gap-2">
+              <Chip selected={d.tradeType === ''} onClick={() => set({ tradeType: '' })}>
+                전체
+              </Chip>
+              {TRADE_TYPE_FILTERS.map((tt) => (
+                <Chip key={tt} selected={d.tradeType === tt} onClick={() => set({ tradeType: tt })}>
+                  {TRADE_TYPE_LABELS[tt]}
+                </Chip>
+              ))}
+            </div>
+          </Section>
+
+          <Section label="평수 (전용)">
+            <Range
+              unit="평"
+              min={d.pyeongMin}
+              max={d.pyeongMax}
+              onMin={(v) => set({ pyeongMin: v })}
+              onMax={(v) => set({ pyeongMax: v })}
+            />
+          </Section>
+
+          <Section label="가격대">
+            <Range
+              unit="억"
+              step="0.1"
+              min={d.eokMin}
+              max={d.eokMax}
+              onMin={(v) => set({ eokMin: v })}
+              onMax={(v) => set({ eokMax: v })}
+            />
+          </Section>
+
+          <Section label="층수">
+            <Range
+              unit="층"
+              min={d.floorMin}
+              max={d.floorMax}
+              onMin={(v) => set({ floorMin: v })}
+              onMax={(v) => set({ floorMax: v })}
+            />
+          </Section>
+
+          <Section label="건축년도 (연식)">
+            <Range
+              unit="년"
+              min={d.yearMin}
+              max={d.yearMax}
+              onMin={(v) => set({ yearMin: v })}
+              onMax={(v) => set({ yearMax: v })}
+            />
+          </Section>
+
+          <Section label="거래일">
             <div className="flex items-center gap-2">
               <DateInput value={d.dateFrom} onChange={(v) => set({ dateFrom: v })} />
               <span className="text-muted-2">~</span>
               <DateInput value={d.dateTo} onChange={(v) => set({ dateTo: v })} />
             </div>
-          </FilterSection>
+          </Section>
         </div>
 
         <button
@@ -623,7 +442,11 @@ function FilterSheet({ initial, guOptions, onApply, onClose }: {
         >
           적용
         </button>
-        <button type="button" onClick={onClose} className="mt-2.5 w-full rounded-[14px] bg-surface py-3.5 text-sm font-bold">
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-2.5 w-full rounded-[14px] bg-surface py-3.5 text-sm font-bold"
+        >
           닫기
         </button>
       </div>
@@ -631,55 +454,61 @@ function FilterSheet({ initial, guOptions, onApply, onClose }: {
   )
 }
 
-function FilterSection({ label, readout, right, children }: {
-  label: string; readout?: string; right?: ReactNode; children: ReactNode
-}) {
+function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <p className="text-xs font-bold text-muted-2">{label}</p>
-          {readout && <span className="font-mono text-[13px] font-bold text-mint">{readout}</span>}
-        </div>
-        {right}
-      </div>
+      <p className="mb-2 text-xs font-bold text-muted-2">{label}</p>
       {children}
     </div>
   )
 }
 
-function PriceInput({ label, value, placeholder, onChange, suffix }: {
-  label: string; value: string; placeholder: string; onChange: (v: string) => void; suffix: string
+function Range({
+  unit,
+  step,
+  min,
+  max,
+  onMin,
+  onMax,
+}: {
+  unit: string
+  step?: string
+  min: string
+  max: string
+  onMin: (v: string) => void
+  onMax: (v: string) => void
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-[11px] border border-white/10 bg-surface px-3 py-2.5">
-      <span className="shrink-0 text-xs text-muted-2">{label}</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        step="0.5"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="min-w-0 flex-1 bg-transparent text-right font-mono text-sm font-bold outline-none placeholder:font-normal placeholder:text-muted-2"
-      />
-      <span className="shrink-0 text-xs text-muted-2">{suffix}</span>
+    <div className="flex items-center gap-2">
+      <NumInput value={min} onChange={onMin} placeholder="최소" step={step} />
+      <span className="shrink-0 text-xs text-muted-2">{unit}</span>
+      <span className="text-muted-2">~</span>
+      <NumInput value={max} onChange={onMax} placeholder="최대" step={step} />
+      <span className="shrink-0 text-xs text-muted-2">{unit}</span>
     </div>
   )
 }
 
-function YearInput({ value, placeholder, onChange }: {
-  value: string; placeholder: string; onChange: (v: string) => void
+function NumInput({
+  value,
+  onChange,
+  placeholder,
+  step,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  step?: string
 }) {
   return (
     <input
-      type="text"
-      inputMode="numeric"
-      maxLength={4}
+      type="number"
+      inputMode="decimal"
+      step={step}
       value={value}
-      onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+      onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="min-w-0 flex-1 rounded-[11px] border border-white/10 bg-surface px-2 py-2.5 text-center font-mono text-sm font-bold outline-none placeholder:text-[11px] placeholder:font-normal placeholder:text-muted-2"
+      className="w-full min-w-0 rounded-[12px] border border-white/[0.08] bg-surface px-3 py-2.5 text-sm font-bold placeholder:text-muted-2 placeholder:font-normal"
     />
   )
 }
@@ -690,14 +519,23 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
       type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="min-w-0 flex-1 rounded-[12px] border border-white/[0.08] bg-surface px-3 py-2.5 text-sm font-bold [color-scheme:dark]"
+      className="w-full min-w-0 rounded-[12px] border border-white/[0.08] bg-surface px-3 py-2.5 text-sm font-bold"
     />
   )
 }
 
-function GSelect({ value, onChange, placeholder, disabled, children }: {
-  value: string; onChange: (v: string) => void
-  placeholder: string; disabled?: boolean; children: ReactNode
+function Select({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  children,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  disabled?: boolean
+  children: ReactNode
 }) {
   return (
     <select

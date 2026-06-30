@@ -17,11 +17,10 @@ public record TransactionFilter(
         Integer buildYearMin,
         Integer buildYearMax,
         LocalDate contractFrom,
-        LocalDate contractTo,
-        Integer recentDays) {
+        LocalDate contractTo) {
 
     public static TransactionFilter empty() {
         return new TransactionFilter(null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 }

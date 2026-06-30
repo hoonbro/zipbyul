@@ -88,7 +88,6 @@ export function useCalendar(params: CalendarParams) {
 export interface AnnouncementParams {
   region?: string
   supplyType?: string
-  openOnly?: boolean
   page?: number
   size?: number
 }
@@ -97,7 +96,6 @@ export function useAnnouncements(params: AnnouncementParams) {
   const qs = new URLSearchParams()
   if (params.region) qs.set('region', params.region)
   if (params.supplyType) qs.set('supplyType', params.supplyType)
-  if (params.openOnly) qs.set('openOnly', 'true')
   if (params.page != null) qs.set('page', String(params.page))
   if (params.size != null) qs.set('size', String(params.size))
   const query = qs.toString()
@@ -204,7 +202,6 @@ export interface RecentTransactionParams {
   buildYearMax?: number
   contractFrom?: string
   contractTo?: string
-  recentDays?: number
 }
 
 export function useRecentTransactions(params: RecentTransactionParams) {
@@ -223,7 +220,6 @@ export function useRecentTransactions(params: RecentTransactionParams) {
   if (params.buildYearMax != null) qs.set('buildYearMax', String(params.buildYearMax))
   if (params.contractFrom) qs.set('contractFrom', params.contractFrom)
   if (params.contractTo) qs.set('contractTo', params.contractTo)
-  if (params.recentDays != null) qs.set('recentDays', String(params.recentDays))
   const query = qs.toString()
   return useQuery({
     queryKey: ['transactions', 'recent', params],

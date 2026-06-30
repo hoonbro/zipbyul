@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Tag from '../components/Tag'
 import { ANNOUNCEMENT_SUPPLY_FILTERS, SUPPLY_TYPE_LABELS } from '../lib/constants'
 import { useAnnouncements } from '../lib/hooks'
@@ -7,9 +7,12 @@ import { useAnnouncements } from '../lib/hooks'
 const SIZE = 20
 
 export default function Announcements() {
-  const [supplyType, setSupplyType] = useState<string | undefined>(undefined)
+  const [searchParams] = useSearchParams()
+  const region = searchParams.get('region') || undefined
+  const openOnly = searchParams.get('openOnly') === 'true'
+  const [supplyType, setSupplyType] = useState<string | undefined>(searchParams.get('supplyType') || undefined)
   const [page, setPage] = useState(0)
-  const { data, isLoading, isError } = useAnnouncements({ supplyType, page, size: SIZE })
+  const { data, isLoading, isError } = useAnnouncements({ region, supplyType, openOnly, page, size: SIZE })
 
   const pickType = (t: string | undefined) => {
     setSupplyType(t)
@@ -22,6 +25,24 @@ export default function Announcements() {
   return (
     <div className="space-y-4">
       <h1 className="mt-1.5 text-[21px] font-extrabold tracking-tight">공고</h1>
+
+      {(region || openOnly) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {region && (
+            <span className="rounded-full border border-mint/35 bg-mint/10 px-3 py-1.5 text-[12px] font-semibold text-mint">
+              {region}
+            </span>
+          )}
+          {openOnly && (
+            <span className="rounded-full border border-sky/35 bg-sky/10 px-3 py-1.5 text-[12px] font-semibold text-sky">
+              진행중
+            </span>
+          )}
+          <Link to="/announcements" className="px-2 py-1 text-[12px] font-semibold text-muted-2 underline">
+            전체 보기
+          </Link>
+        </div>
+      )}
 
       <div className="flex gap-2 overflow-x-auto pb-0.5">
         {filters.map((s) => (

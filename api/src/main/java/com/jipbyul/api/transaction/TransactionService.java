@@ -2,6 +2,7 @@ package com.jipbyul.api.transaction;
 
 import com.jipbyul.api.common.ApiException;
 import com.jipbyul.api.common.ErrorCode;
+import com.jipbyul.api.common.Times;
 import com.jipbyul.api.transaction.dto.RecentTransactionsResponse;
 import com.jipbyul.api.transaction.dto.RecentTransactionsResponse.Item;
 import java.math.BigDecimal;
@@ -112,6 +113,11 @@ public class TransactionService {
         if (f.contractTo() != null) {
             sql.append(" AND t.contract_date <= :contractTo");
             params.put("contractTo", f.contractTo());
+        }
+        if (f.recentDays() != null) {
+            sql.append(" AND t.first_seen_at >= :firstSeenFrom");
+            params.put("firstSeenFrom",
+                    Times.today().minusDays(f.recentDays()).atStartOfDay(Times.KST).toOffsetDateTime());
         }
         sql.append(" ORDER BY t.first_seen_at DESC LIMIT :limit");
 

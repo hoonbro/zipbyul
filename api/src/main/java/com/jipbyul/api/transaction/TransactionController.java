@@ -34,11 +34,13 @@ public class TransactionController {
             @RequestParam(required = false) Integer buildYearMax,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate contractFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate contractTo,
+            @RequestParam(required = false) Integer recentDays,
             @RequestParam(defaultValue = "20") int limit) {
         int bounded = Math.min(Math.max(limit, 1), 100);
+        Integer boundedRecentDays = recentDays == null ? null : Math.min(Math.max(recentDays, 1), 30);
         var filter = new TransactionFilter(region, dong, bjdCode, tradeType, areaMin, areaMax,
                 priceMin, priceMax, floorMin, floorMax, buildYearMin, buildYearMax,
-                contractFrom, contractTo);
+                contractFrom, contractTo, boundedRecentDays);
         return service.recent(filter, bounded);
     }
 }

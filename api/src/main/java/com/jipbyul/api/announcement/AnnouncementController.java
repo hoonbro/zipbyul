@@ -22,11 +22,12 @@ public class AnnouncementController {
     public AnnouncementListResponse list(
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String supplyType,
+            @RequestParam(defaultValue = "false") boolean openOnly,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         int boundedPage = Math.max(page, 0);
         int boundedSize = Math.min(Math.max(size, 1), 100);
-        return service.list(region, supplyType, boundedPage, boundedSize);
+        return service.list(region, supplyType, openOnly, boundedPage, boundedSize);
     }
 
     @GetMapping("/{id}")

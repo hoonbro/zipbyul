@@ -1,4 +1,5 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { MarketSkeleton } from '../components/LoadingSkeleton'
 import { useHousePriceOutlook } from '../lib/hooks'
 
 // CSI는 100 중심. 표시용 밴드 범위(목업 80~120 기준).
@@ -9,7 +10,7 @@ const pct = (v: number) => `${(Math.max(0, Math.min(1, (v - MIN) / (MAX - MIN)))
 export default function MarketOutlook() {
   const { data, isLoading, isError } = useHousePriceOutlook()
 
-  if (isLoading) return <p className="text-sm text-muted-2">불러오는 중…</p>
+  if (isLoading) return <MarketSkeleton />
   if (isError || !data) return <p className="text-sm text-coral">지표를 불러오지 못했습니다.</p>
 
   const change = data.current.changeFromPrevMonth
@@ -67,8 +68,8 @@ export default function MarketOutlook() {
         </div>
 
         {/* 추이 (라인차트) */}
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-44 min-w-0">
+          <ResponsiveContainer width="100%" height={176}>
             <LineChart data={data.history} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey="baseMonth" tick={{ fontSize: 10, fill: '#8a97ab' }} stroke="rgba(255,255,255,0.1)" />

@@ -34,19 +34,16 @@ export default function NotificationCenter({ open, onClose, lastSeenId }: Props)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  if (!open) return null
+
   return (
-    <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="notification-center-title">
+      <div onClick={onClose} className="absolute inset-0 bg-black/55" />
       <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-black/55 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`}
-      />
-      <div
-        className={`absolute left-1/2 top-0 flex max-h-[82%] w-full max-w-[430px] -translate-x-1/2 flex-col rounded-b-[20px] border-b border-white/[0.07] bg-surface shadow-2xl transition-transform duration-300 ${
-          open ? 'translate-y-0' : '-translate-y-full'
-        }`}
+        className="absolute left-1/2 top-0 flex max-h-[82%] w-full max-w-[430px] -translate-x-1/2 flex-col rounded-b-[20px] border-b border-white/[0.07] bg-surface shadow-2xl"
       >
         <div className="flex items-center justify-between px-[18px] pb-3 pt-[calc(env(safe-area-inset-top)_+_14px)]">
-          <h2 className="text-base font-extrabold tracking-tight">알림</h2>
+          <h2 id="notification-center-title" className="text-base font-extrabold tracking-tight">알림</h2>
           <button
             type="button"
             onClick={onClose}

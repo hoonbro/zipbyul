@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import { ListSkeleton } from '../components/LoadingSkeleton'
 import Tag from '../components/Tag'
 import { SUPPLY_TYPE_LABELS } from '../lib/constants'
 import { useAnnouncement } from '../lib/hooks'
@@ -104,9 +105,11 @@ function MarginSection({ margin }: { margin: AnnouncementMargin }) {
         <p className="text-[11px] text-muted">
           근거: {margin.basisRegion} · {margin.basisLevel ? BASIS_LABEL[margin.basisLevel] : '인근 실거래'} · 최근 {margin.basisMonths}개월(전용 ±5㎡) 중앙값 · 평당가는 전용면적 기준
         </p>
-        <p className="text-[11px] leading-relaxed text-muted-2">
-          추정치이며 투자 권유가 아닙니다. 옵션·확장비 제외, 실거래 표본 기반. 투자 판단의 책임은 사용자에게 있습니다.
-        </p>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-2">
+          <p className="text-[11px] leading-relaxed text-muted-2">
+            추정치이며 투자 권유가 아닙니다. 옵션·확장비 제외, 실거래 표본 기반. 투자 판단의 책임은 사용자에게 있습니다.
+          </p>
+        </div>
       </div>
     </section>
   )
@@ -116,7 +119,7 @@ export default function AnnouncementDetail() {
   const { id } = useParams()
   const { data, isLoading, isError, error } = useAnnouncement(Number(id))
 
-  if (isLoading) return <p className="text-sm text-muted-2">불러오는 중…</p>
+  if (isLoading) return <ListSkeleton rows={3} />
   if (isError || !data) {
     return (
       <div className="space-y-2">

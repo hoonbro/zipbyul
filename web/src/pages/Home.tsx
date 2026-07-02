@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import DDayBadge from '../components/DDayBadge'
+import { HomeSkeleton } from '../components/LoadingSkeleton'
 import NotificationCenter from '../components/NotificationCenter'
 import StarRating from '../components/StarRating'
 import { eventTag } from '../lib/colors'
@@ -48,7 +49,7 @@ export default function Home() {
     }
   }
 
-  if (isLoading) return <p className="text-sm text-muted-2">불러오는 중…</p>
+  if (isLoading) return <HomeSkeleton />
   if (isError) return <p className="text-sm text-coral">피드를 불러오지 못했습니다. ({String(error)})</p>
   if (!data) return null
 
@@ -182,27 +183,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* 오늘의 주요 뉴스 (2차) */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <h2 className="text-base font-extrabold tracking-tight">오늘의 주요 뉴스</h2>
-          <span className="rounded-md border border-violet/30 bg-violet/15 px-2 py-px font-mono text-[10px] font-bold text-violet">개발 예정</span>
-        </div>
-        <Link to="/news" className="flex items-center gap-3 rounded-[15px] border border-dashed border-violet/30 bg-soon p-4">
-          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-violet/15">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9aa7ff" strokeWidth="1.8" strokeLinecap="round">
-              <rect x="4" y="4" width="16" height="16" rx="2.5" />
-              <path d="M8 9h8M8 13h8M8 17h5" />
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-ink-2">부동산 뉴스 · AI 요약</div>
-            <div className="mt-0.5 text-xs leading-snug text-muted">관심지역 뉴스와 3줄 요약은 2차에서 제공할 예정이에요.</div>
-          </div>
-          <span className="text-lg text-muted-2">›</span>
-        </Link>
-      </section>
-
       {/* 실거래 + 관심지역 요약 */}
       <div className="flex gap-2.5">
         <Link
@@ -234,6 +214,27 @@ export default function Home() {
           <span className="text-xs leading-snug text-muted-2">{n}</span>
         </div>
       ))}
+
+      {/* 오늘의 주요 뉴스 (2차) */}
+      <section>
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="text-base font-extrabold tracking-tight">오늘의 주요 뉴스</h2>
+          <span className="rounded-md border border-violet/30 bg-violet/15 px-2 py-px font-mono text-[10px] font-bold text-violet">개발 예정</span>
+        </div>
+        <Link to="/news" className="flex items-center gap-3 rounded-[15px] border border-dashed border-violet/30 bg-soon p-4">
+          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-violet/15">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9aa7ff" strokeWidth="1.8" strokeLinecap="round">
+              <rect x="4" y="4" width="16" height="16" rx="2.5" />
+              <path d="M8 9h8M8 13h8M8 17h5" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-ink-2">부동산 뉴스 · AI 요약</div>
+            <div className="mt-0.5 text-xs leading-snug text-muted">관심지역 뉴스와 3줄 요약은 2차에서 제공할 예정이에요.</div>
+          </div>
+          <span className="text-lg text-muted-2">›</span>
+        </Link>
+      </section>
     </div>
   )
 }

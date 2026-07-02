@@ -6,18 +6,12 @@ import { useSavePreferences } from '../lib/hooks'
 
 const STEP_META = [
   { title: '관심지역을 골라주세요', sub: '선택한 자치구의 청약·공고·실거래를 먼저 보여드려요. (복수 선택)' },
-  { title: '지금 상황에 가장\n가까운 건요?', sub: '상황 맞춤 추천은 2차에 추가될 기능이에요. 미리 살펴보고 다음으로 넘어가세요.' },
   { title: '어떤 정보를\n챙겨드릴까요?', sub: '관심 유형을 고르면 그에 맞는 일정을 우선합니다. (복수 선택)' },
   { title: '알림은 어느 정도로\n받으시겠어요?', sub: '중요도와 관심지역 기준으로 알림을 걸러드려요. 언제든 바꿀 수 있어요.' },
 ]
 
-const SITUATIONS = [
-  ['청약 준비 중', '민간·공공 청약 일정과 공고를 챙겨요'],
-  ['공공임대 관심', '행복주택·청년안심주택 등 모집을 받아봐요'],
-  ['매수 검토 중', '금리·정책·관심지역 흐름을 살펴요'],
-  ['전월세 이사 준비 중', '임대차 정책과 전세 정보를 챙겨요'],
-  ['부동산 시장 모니터링', '서울 주요 이슈를 가볍게 훑어봐요'],
-]
+const STEP_COUNT = STEP_META.length
+const LAST_STEP = STEP_COUNT - 1
 
 export default function Onboarding() {
   const navigate = useNavigate()
@@ -35,16 +29,15 @@ export default function Onboarding() {
   const allRegionsSelected = regions.length === SEOUL_GU.length
   const allInterestsSelected = AVAILABLE_INTERESTS.every((c) => interests.includes(c))
 
-  // 스텝별 진행 가능 여부: 지역 ≥1, 유형 ≥1 필수 (상황·알림은 자유)
+  // 스텝별 진행 가능 여부: 지역 ≥1, 유형 ≥1 필수 (알림은 자유)
   const canAdvance =
     (step === 0 && regions.length > 0) ||
-    step === 1 ||
-    (step === 2 && interests.length > 0) ||
-    step === 3
+    (step === 1 && interests.length > 0) ||
+    step === 2
 
   const next = () => {
     if (!canAdvance) return
-    if (step < 3) {
+    if (step < LAST_STEP) {
       setStep(step + 1)
       return
     }
@@ -70,10 +63,10 @@ export default function Onboarding() {
               ‹
             </button>
           )}
-          <span className="font-mono text-xs tracking-[0.08em] text-muted-2">STEP {step + 1} / 4</span>
+          <span className="font-mono text-xs tracking-[0.08em] text-muted-2">STEP {step + 1} / {STEP_COUNT}</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full bg-mint transition-[width] duration-300" style={{ width: `${((step + 1) / 4) * 100}%` }} />
+          <div className="h-full rounded-full bg-mint transition-[width] duration-300" style={{ width: `${((step + 1) / STEP_COUNT) * 100}%` }} />
         </div>
       </div>
 
@@ -102,30 +95,11 @@ export default function Onboarding() {
                 </Chip>
               ))}
             </div>
+            {regions.length === 0 && <p className="mt-3 text-xs text-muted-2">1개 이상 선택하면 다음으로 갈 수 있어요.</p>}
           </>
         )}
 
         {step === 1 && (
-          <>
-            <div className="mb-4 flex items-center gap-2.5 rounded-[13px] border border-violet/20 bg-violet/[0.08] px-3.5 py-3">
-              <span className="shrink-0 rounded-md border border-violet/30 bg-violet/15 px-2 py-0.5 font-mono text-[10px] font-bold text-violet">개발 예정</span>
-              <span className="text-xs leading-snug text-ink-2">상황·페르소나 맞춤 추천은 2차에 추가돼요. 지금은 건너뛰고 다음으로 넘어가도 돼요.</span>
-            </div>
-            <div className="pointer-events-none flex select-none flex-col gap-2.5 opacity-50 saturate-50">
-              {SITUATIONS.map(([name, desc]) => (
-                <div key={name} className="flex items-center justify-between rounded-[14px] border border-white/[0.07] bg-surface px-4 py-3.5">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[15px] font-bold">{name}</span>
-                    <span className="text-[13px] text-muted">{desc}</span>
-                  </div>
-                  <span className="h-[22px] w-[22px] shrink-0 rounded-full border-[1.5px] border-[#3a4456]" />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {step === 2 && (
           <>
             <div className="mb-3 flex items-center justify-between">
               <span className="text-[13px] text-muted">{interests.length}개 선택됨</span>
@@ -145,10 +119,11 @@ export default function Onboarding() {
                 </Chip>
               ))}
             </div>
+            {interests.length === 0 && <p className="mt-3 text-xs text-muted-2">1개 이상 선택하면 다음으로 갈 수 있어요.</p>}
           </>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <div className="flex flex-col gap-2.5">
             {ALERT_LEVELS.map((a) => {
               const on = alertLevel === a.code
@@ -184,9 +159,9 @@ export default function Onboarding() {
           onClick={next}
           disabled={!canAdvance || save.isPending}
           className="flex h-[54px] w-full items-center justify-center rounded-[15px] bg-mint text-base font-extrabold text-mint-ink disabled:opacity-40"
-          style={{ boxShadow: '0 8px 24px rgba(52,245,197,0.25)' }}
+          style={{ boxShadow: canAdvance && !save.isPending ? '0 8px 24px rgba(52,245,197,0.25)' : 'none' }}
         >
-          {save.isPending ? '저장 중…' : step < 3 ? '다음' : '집별 시작하기'}
+          {save.isPending ? '저장 중…' : step < LAST_STEP ? '다음' : '집별 시작하기'}
         </button>
       </div>
     </div>

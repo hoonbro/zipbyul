@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ListSkeleton } from '../components/LoadingSkeleton'
 import Tag from '../components/Tag'
 import { ANNOUNCEMENT_SUPPLY_FILTERS, SUPPLY_TYPE_LABELS } from '../lib/constants'
 import { useAnnouncements } from '../lib/hooks'
@@ -59,7 +60,7 @@ export default function Announcements() {
         ))}
       </div>
 
-      {isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
+      {isLoading && <ListSkeleton rows={4} />}
       {isError && <p className="text-sm text-coral">공고를 불러오지 못했습니다.</p>}
       {data && data.totalCount === 0 && <p className="text-sm text-muted-2">공고가 없습니다.</p>}
 

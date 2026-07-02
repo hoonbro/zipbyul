@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Chip from '../components/Chip'
+import { ListSkeleton } from '../components/LoadingSkeleton'
 import { SEOUL_GU, TRADE_TYPE_LABELS } from '../lib/constants'
 import {
   usePreferences,
@@ -263,7 +264,7 @@ export default function Transactions() {
         </div>
       )}
 
-      {tx.isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
+      {tx.isLoading && <ListSkeleton rows={4} />}
       {tx.data && (
         <p className="text-[13px] text-muted-2">
           총 <span className="font-mono font-bold text-ink">{tx.data.items.length}</span>건

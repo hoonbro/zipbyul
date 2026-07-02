@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import DDayBadge from '../components/DDayBadge'
+import { ListSkeleton } from '../components/LoadingSkeleton'
 import { ddayLook, eventTag } from '../lib/colors'
 import { useCalendar } from '../lib/hooks'
 import type { CalendarItem } from '../lib/types'
@@ -103,12 +104,12 @@ const ddText = (n: number) => (n === 0 ? '오늘' : n > 0 ? `D-${n}` : `D+${-n}`
 const chipCls = 'rounded-md bg-mint/15 px-1.5 py-0.5 text-[10px] font-bold text-mint'
 
 function initialView(param: string | null): 'month' | 'dday' {
-  return param === 'dday' ? 'dday' : 'month'
+  return param === 'month' ? 'month' : 'dday'
 }
 
 function initialPeriod(param: string | null): Period {
   if (param === '7days') return '7일내'
-  return PERIODS.includes(param as Period) ? (param as Period) : '이번주'
+  return PERIODS.includes(param as Period) ? (param as Period) : '7일내'
 }
 
 // 안전마진 등급 배지 (A안: 태그 줄). 기획안 §5.
@@ -390,7 +391,7 @@ export default function Calendar() {
 
       {view === 'month' && <p className="px-0.5 text-sm font-bold text-muted">{`${m}월 ${selDay}일 ${selWeekday}요일`}</p>}
 
-      {isLoading && <p className="text-sm text-muted-2">불러오는 중…</p>}
+      {isLoading && <ListSkeleton rows={3} />}
       {isError && <p className="text-sm text-coral">캘린더를 불러오지 못했습니다.</p>}
       {!isLoading && !isError && listEmpty && (
         <p className="py-8 text-center text-sm text-muted-2">

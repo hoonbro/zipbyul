@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { ListSkeleton } from './LoadingSkeleton'
 import PushForegroundBanner from './PushForegroundBanner'
 
 const icon: Record<string, ReactNode> = {
@@ -52,7 +53,7 @@ export default function Layout() {
     <div className="mx-auto flex h-full max-w-[430px] flex-col bg-bg">
       <PushForegroundBanner />
       <main className="flex-1 overflow-y-auto px-[18px] pt-[calc(env(safe-area-inset-top)_+_8px)] pb-[4.75rem]">
-        <Suspense fallback={<p className="text-sm text-muted-2">불러오는 중…</p>}>
+        <Suspense fallback={<ListSkeleton rows={4} />}>
           <Outlet />
         </Suspense>
       </main>
